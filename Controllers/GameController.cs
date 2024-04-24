@@ -64,12 +64,10 @@ namespace StartaneousAPI.Controllers
         [Route("Join")]
         public Guid Join(Guid ClientId)
         {
-            int playerPosition = 0;
             GameMatch? matchToJoin = Games.FirstOrDefault(x => x.Clients[1] == Guid.Empty);
             if (matchToJoin != null)
             {
                 matchToJoin.Clients[1] = ClientId;
-                playerPosition = 1;
             }
             else
             {
