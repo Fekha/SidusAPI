@@ -64,17 +64,19 @@ namespace StartaneousAPI.Controllers
 
         [HttpGet]
         [Route("Join")]
-        public Guid Join(Guid ClientId)
+        public Tuple<Guid,int> Join(Guid ClientId)
         {
             while (CreatingMatch)
             {
                 System.Threading.Thread.Sleep(500);
             }
             CreatingMatch = true;
+            var position = 0;
             GameMatch? matchToJoin = Games.FirstOrDefault(x => x.Clients[1] == Guid.Empty);
             if (matchToJoin != null)
             {
                 matchToJoin.Clients[1] = ClientId;
+                position = 1;
             }
             else
             {
@@ -84,7 +86,7 @@ namespace StartaneousAPI.Controllers
             }
             CreatingMatch = false;
 
-            return matchToJoin.GameId;
+            return Tuple.Create(matchToJoin.GameId, position);
 
         }
     }
