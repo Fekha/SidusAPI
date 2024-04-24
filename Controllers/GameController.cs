@@ -11,6 +11,7 @@ namespace StartaneousAPI.Controllers
     public class GameController : ControllerBase
     {
         private static List<GameMatch> Games = new List<GameMatch>();
+        private static bool CreatingMatch = false;
         private int maxPlayers = 2;
         private readonly ILogger<GameController> _logger;
 
@@ -26,12 +27,13 @@ namespace StartaneousAPI.Controllers
             Turn[]? turnsToReturn = null;
             Stopwatch timer = new Stopwatch();
             timer.Start();
-            while (turnsToReturn == null || timer.Elapsed.TotalSeconds < 5)
+            while (turnsToReturn == null && timer.Elapsed.TotalSeconds < 10)
             {
                 var turns = Games.FirstOrDefault(x => x.GameId == gameId)?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber)?.ClientActions;
-                if(turns != null && turns.All(x => x.Actions != null)) {
+                if(turns != null && turns.All(x => x?.Actions != null)) {
                     turnsToReturn = turns;
                 }
+                System.Threading.Thread.Sleep(500);
             }
             timer.Stop();
             return turnsToReturn;
@@ -64,6 +66,11 @@ namespace StartaneousAPI.Controllers
         [Route("Join")]
         public Guid Join(Guid ClientId)
         {
+            while (CreatingMatch)
+            {
+                System.Threading.Thread.Sleep(500);
+            }
+            CreatingMatch = true;
             GameMatch? matchToJoin = Games.FirstOrDefault(x => x.Clients[1] == Guid.Empty);
             if (matchToJoin != null)
             {
@@ -75,7 +82,10 @@ namespace StartaneousAPI.Controllers
                 matchToJoin.Clients[0] = ClientId;
                 Games.Add(matchToJoin);
             }
+            CreatingMatch = false;
+
             return matchToJoin.GameId;
+
         }
     }
 }
