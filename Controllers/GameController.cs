@@ -39,7 +39,7 @@ namespace StartaneousAPI.Controllers
 
         [HttpPost]
         [Route("EndTurn")]
-        public bool EndTurn(Turn completedTurn)
+        public bool EndTurn([FromBody] Turn completedTurn)
         {
             GameMatch? game = Games.FirstOrDefault(x => x.GameId == completedTurn.GameId);
             if (game == null)
