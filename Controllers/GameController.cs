@@ -88,7 +88,7 @@ namespace StartaneousAPI.Controllers
             }
             CreatingMatch = true;
             //Todo search for opening, to scale to 4 players
-            GameMatch? matchToJoin = Games.FirstOrDefault(x => x.Players[1] != null);
+            GameMatch? matchToJoin = Games.FirstOrDefault(x => x.Players[1] == null);
             if (matchToJoin != null)
             {
                 matchToJoin.Players[1] = new Player(ClientId);
