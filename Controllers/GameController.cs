@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using StartaneousAPI.Models;
+using StarTaneousAPI.Models;
 using System;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -12,7 +13,6 @@ namespace StartaneousAPI.Controllers
     {
         private static List<GameMatch> Games = new List<GameMatch>();
         private static bool CreatingMatch = false;
-        private int maxPlayers = 2;
         private readonly ILogger<GameController> _logger;
 
         public GameController(ILogger<GameController> logger)
@@ -52,7 +52,13 @@ namespace StartaneousAPI.Controllers
             {
                 return false;
             }
-            int playerPosition = Array.FindIndex(game.Clients, x => x == completedTurn.ClientId);
+            int playerPosition = Array.FindIndex(game.Players, x => x.StationId == completedTurn.ClientId);
+            //Generate Module
+            if (completedTurn.Actions != null && completedTurn.Actions.Any(x => x.actionTypeId == (int)ActionType.GenerateModule))
+            {
+                Random rnd = new Random();
+                completedTurn.Actions.Where(x => x.actionTypeId == (int)ActionType.GenerateModule).ToList().ForEach(x => x = GenerateModel(x, rnd));
+            }            
             GameTurn? gameTurn = game.GameTurns?.FirstOrDefault(x => x.TurnNumber == completedTurn.TurnNumber);
             if (gameTurn == null)
             {
@@ -65,6 +71,12 @@ namespace StartaneousAPI.Controllers
             return true;
         }
 
+        private ActionIds GenerateModel(ActionIds x, Random rnd)
+        {
+            x.generatedModuleId = rnd.Next(0, 13);
+            x.generatedGuid = Guid.NewGuid();
+            return x;
+        }
 
         [HttpGet]
         [Route("Join")]
@@ -76,15 +88,15 @@ namespace StartaneousAPI.Controllers
             }
             CreatingMatch = true;
             //Todo search for opening, to scale to 4 players
-            GameMatch? matchToJoin = Games.FirstOrDefault(x => x.Clients[1] == Guid.Empty);
+            GameMatch? matchToJoin = Games.FirstOrDefault(x => x.Players[1] != null);
             if (matchToJoin != null)
             {
-                matchToJoin.Clients[1] = ClientId;
+                matchToJoin.Players[1] = new Player(ClientId);
             }
             else
             {
                 matchToJoin = new GameMatch();
-                matchToJoin.Clients[0] = ClientId;
+                matchToJoin.Players[0] = new Player(ClientId);
                 Games.Add(matchToJoin);
             }
             CreatingMatch = false;
@@ -93,17 +105,17 @@ namespace StartaneousAPI.Controllers
         
         [HttpGet]
         [Route("HasGameStarted")]
-        public int? HasGameStarted(Guid GameId, Guid ClientId)
+        public Player[]? HasGameStarted(Guid GameId)
         {
-            int? index = null;
+            Player[]? clients = null;
             Stopwatch timer = new Stopwatch();
             timer.Start();
-            while (index == null && timer.Elapsed.TotalSeconds < 10)
+            while (clients == null && timer.Elapsed.TotalSeconds < 10)
             {
                 var game = Games.FirstOrDefault(x => x.GameId == GameId);
-                if (game != null && game.Clients.All(x => x != Guid.Empty))
+                if (game != null && game.Players.All(x => x != null))
                 {
-                    index = Array.IndexOf(game.Clients, ClientId);
+                    clients = game.Players;
                 }
                 else
                 {
@@ -111,7 +123,7 @@ namespace StartaneousAPI.Controllers
                 }
             }
             timer.Stop();
-            return index;
+            return clients;
         }
     }
 }
