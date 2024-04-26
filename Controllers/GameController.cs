@@ -30,10 +30,14 @@ namespace StartaneousAPI.Controllers
             while (turnsToReturn == null && timer.Elapsed.TotalSeconds < 10)
             {
                 var turns = Games.FirstOrDefault(x => x.GameId == gameId)?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber)?.ClientActions;
-                if(turns != null && turns.All(x => x?.Actions != null)) {
+                if (turns != null && turns.All(x => x?.Actions != null))
+                {
                     turnsToReturn = turns;
                 }
-                System.Threading.Thread.Sleep(500);
+                else
+                {
+                    Thread.Sleep(500);
+                }
             }
             timer.Stop();
             return turnsToReturn;
@@ -64,19 +68,18 @@ namespace StartaneousAPI.Controllers
 
         [HttpGet]
         [Route("Join")]
-        public Tuple<Guid,int> Join(Guid ClientId)
+        public Guid Join(Guid ClientId)
         {
             while (CreatingMatch)
             {
-                System.Threading.Thread.Sleep(500);
+                Thread.Sleep(500);
             }
             CreatingMatch = true;
-            var position = 0;
+            //Todo search for opening, to scale to 4 players
             GameMatch? matchToJoin = Games.FirstOrDefault(x => x.Clients[1] == Guid.Empty);
             if (matchToJoin != null)
             {
                 matchToJoin.Clients[1] = ClientId;
-                position = 1;
             }
             else
             {
@@ -85,9 +88,30 @@ namespace StartaneousAPI.Controllers
                 Games.Add(matchToJoin);
             }
             CreatingMatch = false;
-
-            return Tuple.Create(matchToJoin.GameId, position);
-
+            return matchToJoin.GameId;
+        }
+        
+        [HttpGet]
+        [Route("HasGameStarted")]
+        public int? HasGameStarted(Guid GameId, Guid ClientId)
+        {
+            int? index = null;
+            Stopwatch timer = new Stopwatch();
+            timer.Start();
+            while (index == null && timer.Elapsed.TotalSeconds < 10)
+            {
+                var game = Games.FirstOrDefault(x => x.GameId == GameId);
+                if (game != null && game.Clients.All(x => x != Guid.Empty))
+                {
+                    index = Array.IndexOf(game.Clients, ClientId);
+                }
+                else
+                {
+                    Thread.Sleep(500);
+                }
+            }
+            timer.Stop();
+            return index;
         }
     }
 }
