@@ -73,7 +73,7 @@ namespace StartaneousAPI.Controllers
 
         private ActionIds GenerateModel(ActionIds x, Random rnd)
         {
-            x.generatedModuleId = rnd.Next(0, 13);
+            x.generatedModuleId = rnd.Next(0, 11);
             x.generatedGuid = Guid.NewGuid();
             return x;
         }
