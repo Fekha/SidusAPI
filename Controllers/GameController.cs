@@ -13,12 +13,6 @@ namespace StartaneousAPI.Controllers
     {
         private static List<GameMatch> Games = new List<GameMatch>();
         private static bool CreatingMatch = false;
-        private readonly ILogger<GameController> _logger;
-
-        public GameController(ILogger<GameController> logger)
-        {
-            _logger = logger;
-        }
 
         [HttpGet]
         [Route("GetTurn")]
@@ -79,27 +73,37 @@ namespace StartaneousAPI.Controllers
         }
 
         [HttpGet]
-        [Route("Join")]
-        public Guid Join(Guid ClientId)
+        [Route("Find")]
+        public List<Guid> Find()
         {
-            while (CreatingMatch)
-            {
-                Thread.Sleep(500);
-            }
-            CreatingMatch = true;
-            //Todo search for opening, to scale to 4 players
-            GameMatch? matchToJoin = Games.FirstOrDefault(x => x.Players[1] == null);
+            return Games.Where(x=>x.Players.Any(y=>y == null)).Select(x=>x.GameId).ToList();
+        } 
+        
+        [HttpGet]
+        [Route("Join")]
+        public Guid? Join(Guid ClientId, Guid GameId)
+        {
+            GameMatch? matchToJoin = Games.FirstOrDefault(x => x.GameId == GameId && x.Players.Any(y=> y == null));
             if (matchToJoin != null)
             {
-                matchToJoin.Players[1] = new Player(ClientId);
+                for (var i = 0; i < matchToJoin.Players.Count(); i++) {
+                    if (matchToJoin.Players[i] == null)
+                    {
+                        matchToJoin.Players[i] = new Player(ClientId);
+                        return matchToJoin.GameId;
+                    }
+                }
             }
-            else
-            {
-                matchToJoin = new GameMatch();
-                matchToJoin.Players[0] = new Player(ClientId);
-                Games.Add(matchToJoin);
-            }
-            CreatingMatch = false;
+            return null;
+        }
+        
+        [HttpGet]
+        [Route("Create")]
+        public Guid Create(Guid ClientId)
+        {
+            GameMatch matchToJoin = new GameMatch();
+            matchToJoin.Players[0] = new Player(ClientId);
+            Games.Add(matchToJoin);
             return matchToJoin.GameId;
         }
         
