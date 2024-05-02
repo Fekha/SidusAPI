@@ -12,7 +12,6 @@ namespace StartaneousAPI.Controllers
     public class GameController : ControllerBase
     {
         private static List<GameMatch> Games = new List<GameMatch>();
-        private static bool CreatingMatch = false;
 
         [HttpGet]
         [Route("GetTurn")]
@@ -47,12 +46,18 @@ namespace StartaneousAPI.Controllers
                 return false;
             }
             int playerPosition = Array.FindIndex(game.Players, x => x.StationId == completedTurn.ClientId);
-            //Generate Module
-            if (completedTurn.Actions != null && completedTurn.Actions.Any(x => x.actionTypeId == (int)ActionType.GenerateModule))
-            {
-                Random rnd = new Random();
-                completedTurn.Actions.Where(x => x.actionTypeId == (int)ActionType.GenerateModule).ToList().ForEach(x => x = GenerateModel(x, rnd));
-            }            
+            //Generate Server side action values
+            if (completedTurn.Actions != null) {
+                if (completedTurn.Actions.Any(x => x.actionTypeId == (int)ActionType.GenerateModule))
+                {
+                    Random rnd = new Random();
+                    completedTurn.Actions.Where(x => x.actionTypeId == (int)ActionType.GenerateModule).ToList().ForEach(x => x = GenerateModel(x, rnd));
+                }
+                if (completedTurn.Actions.Any(x => x.actionTypeId == (int)ActionType.CreateFleet))
+                {
+                    completedTurn.Actions.Where(x => x.actionTypeId == (int)ActionType.CreateFleet).ToList().ForEach(x => x.generatedGuid = Guid.NewGuid());
+                }
+            }
             GameTurn? gameTurn = game.GameTurns?.FirstOrDefault(x => x.TurnNumber == completedTurn.TurnNumber);
             if (gameTurn == null)
             {
