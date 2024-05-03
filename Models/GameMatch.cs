@@ -4,15 +4,17 @@ namespace StartaneousAPI.Models
 {
     public class GameMatch
     {
-        private int maxPlayers = 2;
+        public int MaxPlayers {get; set; }
         public Guid GameId { get; set; }
         public List<GameTurn> GameTurns { get; set; }
         public Player[] Players { get; set; }
 
-        public GameMatch()
+        public GameMatch(NewGame clientGame)
         {
             GameId = Guid.NewGuid();
-            Players = new Player[maxPlayers];
+            Players = new Player[clientGame.MaxPlayers];
+            Players[0] = new Player(clientGame.ClientId);
+            MaxPlayers = clientGame.MaxPlayers;
             GameTurns = new List<GameTurn>();
         }
     }
