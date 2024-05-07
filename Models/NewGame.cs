@@ -6,5 +6,6 @@
         public Guid GameId { get; set; }
         public int MaxPlayers { get; set; }
         public int PlayerCount { get; set; }
+        public List<string> GameSettings { get; set; }
     }
 }

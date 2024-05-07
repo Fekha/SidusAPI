@@ -30,7 +30,7 @@ namespace StartaneousAPI.Controllers
                 }
                 else
                 {
-                    Thread.Sleep(500);
+                    Thread.Sleep(250);
                 }
             }
             timer.Stop();
@@ -111,6 +111,7 @@ namespace StartaneousAPI.Controllers
                         ClientGame.GameId = matchToJoin.GameId;
                         ClientGame.MaxPlayers = matchToJoin.MaxPlayers;
                         ClientGame.PlayerCount = matchToJoin.Players.Where(y => y != null).Count();
+                        ClientGame.GameSettings = matchToJoin.GameSettings;
                         return ClientGame;
                     }
                 }
@@ -149,7 +150,7 @@ namespace StartaneousAPI.Controllers
                     }
                     else
                     {
-                        Thread.Sleep(500);
+                        Thread.Sleep(250);
                     }
                 }
             }

@@ -8,6 +8,7 @@ namespace StartaneousAPI.Models
         public Guid GameId { get; set; }
         public List<GameTurn> GameTurns { get; set; }
         public Player[] Players { get; set; }
+        public List<string> GameSettings { get; set; }
 
         public GameMatch(NewGame clientGame)
         {
@@ -16,6 +17,7 @@ namespace StartaneousAPI.Models
             Players[0] = new Player(clientGame.ClientId);
             MaxPlayers = clientGame.MaxPlayers;
             GameTurns = new List<GameTurn>();
+            GameSettings = clientGame.GameSettings;
         }
     }
 }
