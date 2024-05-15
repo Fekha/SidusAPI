@@ -1,4 +1,4 @@
-﻿namespace StartaneousAPI.Models
+﻿namespace StartaneousAPI.ServerModels
 {
     [Serializable]
     public class GameMatch
@@ -12,6 +12,7 @@
     [Serializable]
     public class GameTurn
     {
+        public Guid GameGuid { get; set; }
         public int TurnNumber { get; set; }
         public Player[]? Players { get; set; }
     }
@@ -19,36 +20,36 @@
     [Serializable]
     public class Player
     {
-        public Unit? Station { get; set; }
-        public List<Unit>? Fleets { get; set; }
-        public List<Actions>? Actions { get; set; }
+        public ServerUnit? Station { get; set; }
+        public List<ServerUnit>? Fleets { get; set; }
+        public List<ServerAction>? Actions { get; set; }
         public List<Guid>? ModulesGuids { get; set; }
-        public int Credits { get; set; }
+        public int? Credits { get; set; }
     }
 
     [Serializable]
-    public class Actions
+    public class ServerAction
     {
         public int? ActionTypeId { get; set; }
         public Guid? SelectedUnitGuid { get; set; }
         public List<Guid>? SelectedModulesGuids { get; set; }
-        public List<Coords>? SelectedCoords { get; set; }
+        public List<ServerCoords>? SelectedCoords { get; set; }
         public int? GeneratedModuleId { get; set; }
         public Guid? GeneratedGuid { get; set; }
     }
     
     [Serializable]
-    public class Unit
+    public class ServerUnit
     {
-        public Guid? UnitId { get; set; }
-        public Coords? Location { get; set; }
+        public Guid? UnitGuid { get; set; }
+        public ServerCoords? Location { get; set; }
         public Direction Facing { get; set; }
     }
 
     [Serializable]
-    public class Coords
+    public class ServerCoords
     {
-        public int X { get; set; }
-        public int Y { get; set; }
+        public int? X { get; set; }
+        public int? Y { get; set; }
     }
 }

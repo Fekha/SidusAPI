@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using StartaneousAPI.Models;
+using StartaneousAPI.ServerModels;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,18 +14,17 @@ namespace StartaneousAPI.Controllers
         private static List<GameMatch> ServerGames = new List<GameMatch>();
 
         [HttpGet]
-        [Route("GetTurn")]
-        public GameTurn? GetTurn(Guid gameGuid, int turnNumber)
+        [Route("GetTurns")]
+        public GameTurn? GetTurns(Guid gameGuid, int turnNumber)
         {
-            GameTurn? gameToReturn = null;
             Stopwatch timer = new Stopwatch();
             timer.Start();
-            while (gameToReturn == null && timer.Elapsed.TotalSeconds < 10)
+            while (timer.Elapsed.TotalSeconds < 10)
             {
-                var turns = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid)?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber && (x.Players?.All(x => x.Actions != null) ?? false));
+                var turns = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid)?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber && (x.Players?.All(x => x != null) ?? false));
                 if (turns != null)
                 {
-                    gameToReturn = turns;
+                    return turns;
                 }
                 else
                 {
@@ -33,15 +32,14 @@ namespace StartaneousAPI.Controllers
                 }
             }
             timer.Stop();
-            return gameToReturn;
+            return null;
         }
 
         [HttpPost]
         [Route("EndTurn")]
-        public bool EndTurn([FromBody] GameMatch currentGame)
+        public bool EndTurn([FromBody] GameTurn currentTurn)
         {
-            GameMatch? serverGame = ServerGames.FirstOrDefault(x => x.GameGuid == currentGame.GameGuid);
-            var currentTurn = currentGame.GameTurns?.LastOrDefault();
+            GameMatch? serverGame = ServerGames.FirstOrDefault(x => x.GameGuid == currentTurn.GameGuid);
             int playerIndex = -1;
             Player? playerTurn = null;
             for (int i = 0; i < currentTurn.Players?.Count(); i++)
@@ -80,7 +78,7 @@ namespace StartaneousAPI.Controllers
             return true;
         }
 
-        private Actions GenerateModel(Actions x, Random rnd)
+        private ServerModels.ServerAction GenerateModel(ServerModels.ServerAction x, Random rnd)
         {
             x.GeneratedModuleId = rnd.Next(0, 23);
             x.GeneratedGuid = Guid.NewGuid();
@@ -88,20 +86,20 @@ namespace StartaneousAPI.Controllers
         }
 
         [HttpGet]
-        [Route("Find")]
-        public List<GameMatch> Find()
+        [Route("FindGames")]
+        public List<GameMatch> FindGames()
         {
             return ServerGames.Where(x => (x.GameTurns[0]?.Players?.Any(y => y == null) ?? false)).ToList();
         } 
         
-        [HttpGet]
-        [Route("Join")]
-        public GameMatch? Join(GameMatch ClientGame)
+        [HttpPost]
+        [Route("JoinGame")]
+        public GameMatch? JoinGame(GameMatch ClientGame)
         {
             GameMatch? matchToJoin = ServerGames.FirstOrDefault(x => x.GameGuid == ClientGame.GameGuid && (x.GameTurns[0]?.Players?.Any(y=> y == null) ?? false));
             if (matchToJoin != null)
             {
-                for (var i = 0; i < matchToJoin.GameTurns[0]?.Players?.Count(); i++) {
+                for (var i = (matchToJoin.GameTurns[0]?.Players?.Count()-1 ?? 0); i >= 0 ; i--) {
                     if (matchToJoin.GameTurns[0]?.Players[i] == null)
                     {
                         matchToJoin.GameTurns[0].Players[i] = ClientGame.GameTurns[0].Players[1];
@@ -113,8 +111,8 @@ namespace StartaneousAPI.Controllers
         }
         
         [HttpPost]
-        [Route("Create")]
-        public GameMatch Create([FromBody] GameMatch ClientGame)
+        [Route("CreateGame")]
+        public GameMatch CreateGame([FromBody] GameMatch ClientGame)
         {
             ClientGame.GameGuid = Guid.NewGuid();
             ServerGames.Add(ClientGame);
