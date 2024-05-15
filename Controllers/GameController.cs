@@ -61,10 +61,6 @@ namespace StartaneousAPI.Controllers
                     Random rnd = new Random();
                     playerTurn.Actions.Where(x => x.ActionTypeId == (int)ActionType.GenerateModule).ToList().ForEach(x => x = GenerateModel(x, rnd));
                 }
-                if (playerTurn.Actions.Any(x => x.ActionTypeId == (int)ActionType.CreateFleet))
-                {
-                    playerTurn.Actions.Where(x => x.ActionTypeId == (int)ActionType.CreateFleet).ToList().ForEach(x => x.GeneratedGuid = Guid.NewGuid());
-                }
             }
             GameTurn? gameTurn = serverGame.GameTurns?.FirstOrDefault(x => x.TurnNumber == currentTurn.TurnNumber);
             if (gameTurn == null)

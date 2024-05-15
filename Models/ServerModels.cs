@@ -32,7 +32,7 @@
     {
         public int? ActionTypeId { get; set; }
         public Guid? SelectedUnitGuid { get; set; }
-        public List<Guid>? SelectedModulesGuids { get; set; }
+        public Guid? SelectedModuleGuid { get; set; }
         public List<ServerCoords>? SelectedCoords { get; set; }
         public int? GeneratedModuleId { get; set; }
         public Guid? GeneratedGuid { get; set; }
