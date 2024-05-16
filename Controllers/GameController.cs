@@ -12,6 +12,7 @@ namespace StartaneousAPI.Controllers
     public class GameController : ControllerBase
     {
         private static List<GameMatch> ServerGames = new List<GameMatch>();
+        private static bool SubmittingTurn = false;
 
         [HttpGet]
         [Route("GetTurns")]
@@ -21,10 +22,10 @@ namespace StartaneousAPI.Controllers
             timer.Start();
             while (timer.Elapsed.TotalSeconds < 10)
             {
-                var turns = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid)?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber && (x.Players?.All(x => x != null) ?? false));
-                if (turns != null)
+                var gameTurn = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid)?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
+                if (!SubmittingTurn && gameTurn != null && AllSubmittedTurn(gameTurn))
                 {
-                    return turns;
+                    return gameTurn;
                 }
                 else
                 {
@@ -39,6 +40,12 @@ namespace StartaneousAPI.Controllers
         [Route("EndTurn")]
         public bool EndTurn([FromBody] GameTurn currentTurn)
         {
+            while (SubmittingTurn)
+            {
+                Thread.Sleep(250);
+            }
+            SubmittingTurn = true;
+
             GameMatch? serverGame = ServerGames.FirstOrDefault(x => x.GameGuid == currentTurn.GameGuid);
             int playerIndex = -1;
             Player? playerTurn = null;
@@ -52,33 +59,73 @@ namespace StartaneousAPI.Controllers
             }
             if (serverGame == null || playerTurn == null || playerIndex == -1)
             {
+                SubmittingTurn = false;
                 return false;
-            }
-            //Generate Server side action values
-            if (playerTurn.Actions != null) {
-                if (playerTurn.Actions.Any(x => x.ActionTypeId == (int)ActionType.GenerateModule))
-                {
-                    Random rnd = new Random();
-                    playerTurn.Actions.Where(x => x.ActionTypeId == (int)ActionType.GenerateModule).ToList().ForEach(x => x = GenerateModel(x, rnd));
-                }
             }
             GameTurn? gameTurn = serverGame.GameTurns?.FirstOrDefault(x => x.TurnNumber == currentTurn.TurnNumber);
             if (gameTurn == null)
             {
+               
+                foreach (var module in currentTurn.MarketModules)
+                {
+                    if (module.TurnsLeft > 1)
+                    {
+                        module.MidBid--;
+                        module.TurnsLeft--;
+                    }
+                    else
+                    {
+                        var newModule = GetNewServerModule(serverGame.NumberOfModules);
+                        Random rnd = new Random();
+                        module.ModuleGuid = newModule.ModuleGuid;
+                        module.ModuleId = module.ModuleId;
+                        module.MidBid = module.MidBid;
+                        module.TurnsLeft = module.TurnsLeft;
+                    }
+                    module.PlayerBid = module.MidBid;
+                } 
                 serverGame.GameTurns.Add(currentTurn);
             }
             else
             {
                 gameTurn.Players[playerIndex] = playerTurn;
+                if (AllSubmittedTurn(gameTurn))
+                {
+                    var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModule.ModuleGuid);
+                    foreach (var bid in bidGroup)
+                    {
+                        if (bid.Count() > 1)
+                        {
+                            var bidsInOrder = bid.OrderByDescending(x => x.SelectedModule.PlayerBid).ThenBy(x => x.ActionOrder).ToList();
+                            for (var i = 1; i < bidsInOrder.Count(); i++)
+                            {
+                                bidsInOrder[i].SelectedModule = null;
+                            }
+                        }
+                        gameTurn.MarketModules.Remove(gameTurn.MarketModules.FirstOrDefault(x => x.ModuleGuid == bid.Key.Value));
+                        gameTurn.MarketModules.Add(GetNewServerModule(serverGame.NumberOfModules));
+                    }
+                }
             }
+            SubmittingTurn = false;
             return true;
         }
 
-        private ServerModels.ServerAction GenerateModel(ServerModels.ServerAction x, Random rnd)
+        private ServerModule GetNewServerModule(int numMods)
         {
-            x.GeneratedModuleId = rnd.Next(0, 23);
-            x.GeneratedGuid = Guid.NewGuid();
-            return x;
+            Random rnd = new Random();
+            return new ServerModule()
+            {
+                ModuleGuid = Guid.NewGuid(),
+                ModuleId = rnd.Next(0, numMods),
+                MidBid = 6,
+                TurnsLeft = 5,
+            };
+        }
+
+        private bool AllSubmittedTurn(GameTurn? gameTurn)
+        {
+            return gameTurn?.Players?.All(x => x != null) ?? false;
         }
 
         [HttpGet]
@@ -111,6 +158,11 @@ namespace StartaneousAPI.Controllers
         public GameMatch CreateGame([FromBody] GameMatch ClientGame)
         {
             ClientGame.GameGuid = Guid.NewGuid();
+            Random rnd = new Random();
+            for (int i = 0; i < 2 + ClientGame.MaxPlayers; i++)
+            {
+                ClientGame.GameTurns[0].MarketModules.Add(GetNewServerModule(ClientGame.NumberOfModules));
+            }
             ServerGames.Add(ClientGame);
             return ClientGame;
         }
