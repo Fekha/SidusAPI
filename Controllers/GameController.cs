@@ -16,22 +16,21 @@ namespace SidusAPI.Controllers
 
         [HttpGet]
         [Route("GetTurns")]
-        public GameTurn? GetTurns(Guid gameGuid, int turnNumber)
+        public GameTurn? GetTurns(Guid gameGuid, int turnNumber, bool quickSearch)
         {
             Stopwatch timer = new Stopwatch();
             timer.Start();
-            while (timer.Elapsed.TotalSeconds < 10)
-            {
+            do {
                 var gameTurn = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid)?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
                 if (!SubmittingTurn && gameTurn != null && AllSubmittedTurn(gameTurn))
                 {
                     return gameTurn;
                 }
-                else
+                else if(!quickSearch)
                 {
                     Thread.Sleep(250);
                 }
-            }
+            } while (timer.Elapsed.TotalSeconds < 10 && !quickSearch);
             timer.Stop();
             return null;
         }
@@ -98,6 +97,7 @@ namespace SidusAPI.Controllers
                     if (bid.Count() > 1)
                     {
                         var bidsInOrder = bid.OrderByDescending(x => x.SelectedModule.PlayerBid).ThenBy(x => x.ActionOrder).ToList();
+                        bidsInOrder[0].SelectedModule.PlayerBid = bidsInOrder[1].SelectedModule.PlayerBid;
                         for (var i = 1; i < bidsInOrder.Count(); i++)
                         {
                             bidsInOrder[i].SelectedModule = null;
@@ -191,7 +191,7 @@ namespace SidusAPI.Controllers
                 }
             }
             timer.Stop();
-            return null;
+            return game;
         }
     }
 }
