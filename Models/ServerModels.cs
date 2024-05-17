@@ -1,4 +1,4 @@
-﻿namespace StartaneousAPI.ServerModels
+﻿namespace SidusAPI.ServerModels
 {
     [Serializable]
     public class GameMatch

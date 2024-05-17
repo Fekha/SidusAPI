@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
-using StartaneousAPI.ServerModels;
+using SidusAPI.ServerModels;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
-namespace StartaneousAPI.Controllers
+namespace SidusAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -45,7 +45,6 @@ namespace StartaneousAPI.Controllers
                 Thread.Sleep(250);
             }
             SubmittingTurn = true;
-
             GameMatch? serverGame = ServerGames.FirstOrDefault(x => x.GameGuid == currentTurn.GameGuid);
             int playerIndex = -1;
             Player? playerTurn = null;
@@ -85,26 +84,27 @@ namespace StartaneousAPI.Controllers
                     module.PlayerBid = module.MidBid;
                 } 
                 serverGame.GameTurns.Add(currentTurn);
+                gameTurn = currentTurn;
             }
             else
             {
                 gameTurn.Players[playerIndex] = playerTurn;
-                if (AllSubmittedTurn(gameTurn))
+            }
+            if (AllSubmittedTurn(gameTurn))
+            {
+                var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModule.ModuleGuid);
+                foreach (var bid in bidGroup)
                 {
-                    var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModule.ModuleGuid);
-                    foreach (var bid in bidGroup)
+                    if (bid.Count() > 1)
                     {
-                        if (bid.Count() > 1)
+                        var bidsInOrder = bid.OrderByDescending(x => x.SelectedModule.PlayerBid).ThenBy(x => x.ActionOrder).ToList();
+                        for (var i = 1; i < bidsInOrder.Count(); i++)
                         {
-                            var bidsInOrder = bid.OrderByDescending(x => x.SelectedModule.PlayerBid).ThenBy(x => x.ActionOrder).ToList();
-                            for (var i = 1; i < bidsInOrder.Count(); i++)
-                            {
-                                bidsInOrder[i].SelectedModule = null;
-                            }
+                            bidsInOrder[i].SelectedModule = null;
                         }
-                        gameTurn.MarketModules.Remove(gameTurn.MarketModules.FirstOrDefault(x => x.ModuleGuid == bid.Key.Value));
-                        gameTurn.MarketModules.Add(GetNewServerModule(serverGame.NumberOfModules));
                     }
+                    gameTurn.MarketModules.Remove(gameTurn.MarketModules.FirstOrDefault(x => x.ModuleGuid == bid.Key.Value));
+                    gameTurn.MarketModules.Add(GetNewServerModule(serverGame.NumberOfModules));
                 }
             }
             SubmittingTurn = false;

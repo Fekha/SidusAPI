@@ -73,4 +73,4 @@ RUN apk add --no-cache \
     icu-libs
 
 # Remove SSL configuration to run with HTTP
-ENTRYPOINT ["dotnet", "StartaneousAPI.dll"]
+ENTRYPOINT ["dotnet", "SidusAPI.dll"]

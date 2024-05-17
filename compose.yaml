@@ -10,8 +10,8 @@
 version: '3.8'
 
 services:
-  startaneousapi:
-    image: startaneousapi-server
+  sidusapi:
+    image: sidusapi-server
     ports:
       - "7001:7001"
     volumes:

@@ -9,7 +9,7 @@
     }
   },
   "profiles": {
-    "StartaneousAPI": {
+    "SidusAPI": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
