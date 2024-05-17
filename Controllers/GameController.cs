@@ -104,6 +104,10 @@ namespace SidusAPI.Controllers
                             bidsInOrder[i].SelectedModule = null;
                         }
                     }
+                    else
+                    {
+                        bid.FirstOrDefault().SelectedModule.PlayerBid = bid.FirstOrDefault().SelectedModule.MidBid;
+                    }
                     //reset bought module
                     var module = gameTurn.MarketModules?.FirstOrDefault(x => x.ModuleGuid == bid.Key);
                     var newModule = GetNewServerModule(serverGame.NumberOfModules);
