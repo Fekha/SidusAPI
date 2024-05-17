@@ -63,8 +63,18 @@ namespace SidusAPI.Controllers
             GameTurn? gameTurn = serverGame.GameTurns?.FirstOrDefault(x => x.TurnNumber == currentTurn.TurnNumber);
             if (gameTurn == null)
             {
-               
-                foreach (var module in currentTurn.MarketModules)
+                serverGame.GameTurns.Add(currentTurn);
+                gameTurn = currentTurn;
+            }
+            else
+            {
+                gameTurn.Players[playerIndex] = playerTurn;
+            }
+            //Do market stuff if everyone is done with their turns
+            if (AllSubmittedTurn(gameTurn))
+            {
+                //Decrease turn timer and reset old modules
+                foreach (var module in gameTurn.MarketModules)
                 {
                     if (module.TurnsLeft > 1)
                     {
@@ -74,23 +84,14 @@ namespace SidusAPI.Controllers
                     else
                     {
                         var newModule = GetNewServerModule(serverGame.NumberOfModules);
-                        Random rnd = new Random();
                         module.ModuleGuid = newModule.ModuleGuid;
-                        module.ModuleId = module.ModuleId;
-                        module.MidBid = module.MidBid;
-                        module.TurnsLeft = module.TurnsLeft;
+                        module.ModuleId = newModule.ModuleId;
+                        module.MidBid = newModule.MidBid;
+                        module.TurnsLeft = newModule.TurnsLeft;
                     }
                     module.PlayerBid = module.MidBid;
-                } 
-                serverGame.GameTurns.Add(currentTurn);
-                gameTurn = currentTurn;
-            }
-            else
-            {
-                gameTurn.Players[playerIndex] = playerTurn;
-            }
-            if (AllSubmittedTurn(gameTurn))
-            {
+                }
+                //Check on bid wars
                 var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModule.ModuleGuid);
                 foreach (var bid in bidGroup)
                 {
@@ -103,8 +104,13 @@ namespace SidusAPI.Controllers
                             bidsInOrder[i].SelectedModule = null;
                         }
                     }
-                    gameTurn.MarketModules.Remove(gameTurn.MarketModules.FirstOrDefault(x => x.ModuleGuid == bid.Key.Value));
-                    gameTurn.MarketModules.Add(GetNewServerModule(serverGame.NumberOfModules));
+                    //reset bought module
+                    var module = gameTurn.MarketModules?.FirstOrDefault(x => x.ModuleGuid == bid.Key);
+                    var newModule = GetNewServerModule(serverGame.NumberOfModules);
+                    module.ModuleGuid = newModule.ModuleGuid;
+                    module.ModuleId = newModule.ModuleId;
+                    module.MidBid = newModule.MidBid;
+                    module.TurnsLeft = newModule.TurnsLeft;
                 }
             }
             SubmittingTurn = false;
