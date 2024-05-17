@@ -18,20 +18,29 @@ namespace SidusAPI.Controllers
         [Route("GetTurns")]
         public GameTurn? GetTurns(Guid gameGuid, int turnNumber, bool quickSearch)
         {
-            Stopwatch timer = new Stopwatch();
-            timer.Start();
-            do {
-                var gameTurn = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid)?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                if (!SubmittingTurn && gameTurn != null && AllSubmittedTurn(gameTurn))
+            try
+            {
+                Stopwatch timer = new Stopwatch();
+                timer.Start();
+                do
                 {
-                    return gameTurn;
-                }
-                else if(!quickSearch)
-                {
-                    Thread.Sleep(250);
-                }
-            } while (timer.Elapsed.TotalSeconds < 10 && !quickSearch);
-            timer.Stop();
+                    var gameTurn = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid)?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
+                    if (!SubmittingTurn && gameTurn != null && AllSubmittedTurn(gameTurn))
+                    {
+                        return gameTurn;
+                    }
+                    else if (!quickSearch)
+                    {
+                        Thread.Sleep(250);
+                    }
+                } while (timer.Elapsed.TotalSeconds < 10 && !quickSearch);
+                timer.Stop();
+            }
+            catch (Exception ex)
+            {
+                Debug.Print(ex.ToString());
+                return null;
+            }
             return null;
         }
 
@@ -39,83 +48,104 @@ namespace SidusAPI.Controllers
         [Route("EndTurn")]
         public bool EndTurn([FromBody] GameTurn currentTurn)
         {
+            Stopwatch timer = new Stopwatch();
+            timer.Start();
             while (SubmittingTurn)
             {
                 Thread.Sleep(250);
+                if (timer.Elapsed.TotalSeconds > 5)
+                {
+                    timer.Stop();
+                    return false;
+                }
             }
+            timer.Stop();
             SubmittingTurn = true;
-            GameMatch? serverGame = ServerGames.FirstOrDefault(x => x.GameGuid == currentTurn.GameGuid);
-            int playerIndex = -1;
-            Player? playerTurn = null;
-            for (int i = 0; i < currentTurn.Players?.Count(); i++)
+            try
             {
-                if (currentTurn.Players[i] != null)
+                GameMatch? serverGame = ServerGames.FirstOrDefault(x => x.GameGuid == currentTurn.GameGuid);
+                int playerIndex = -1;
+                Player? playerTurn = null;
+                for (int i = 0; i < currentTurn.Players?.Count(); i++)
                 {
-                    playerIndex = i;
-                    playerTurn = currentTurn.Players[i];
-                }
-            }
-            if (serverGame == null || playerTurn == null || playerIndex == -1)
-            {
-                SubmittingTurn = false;
-                return false;
-            }
-            GameTurn? gameTurn = serverGame.GameTurns?.FirstOrDefault(x => x.TurnNumber == currentTurn.TurnNumber);
-            if (gameTurn == null)
-            {
-                serverGame.GameTurns.Add(currentTurn);
-                gameTurn = currentTurn;
-            }
-            else
-            {
-                gameTurn.Players[playerIndex] = playerTurn;
-            }
-            //Do market stuff if everyone is done with their turns
-            if (AllSubmittedTurn(gameTurn))
-            {
-                //Decrease turn timer and reset old modules
-                foreach (var module in gameTurn.MarketModules)
-                {
-                    if (module.TurnsLeft > 1)
+                    if (currentTurn.Players[i] != null)
                     {
-                        module.MidBid--;
-                        module.TurnsLeft--;
+                        playerIndex = i;
+                        playerTurn = currentTurn.Players[i];
                     }
-                    else
-                    {
-                        var newModule = GetNewServerModule(serverGame.NumberOfModules);
-                        module.ModuleGuid = newModule.ModuleGuid;
-                        module.ModuleId = newModule.ModuleId;
-                        module.MidBid = newModule.MidBid;
-                        module.TurnsLeft = newModule.TurnsLeft;
-                    }
-                    module.PlayerBid = module.MidBid;
                 }
-                //Check on bid wars
-                var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModule.ModuleGuid);
-                foreach (var bid in bidGroup)
+                if (serverGame == null || playerTurn == null || playerIndex == -1)
                 {
-                    if (bid.Count() > 1)
+                    SubmittingTurn = false;
+                    return false;
+                }
+                GameTurn? gameTurn = serverGame.GameTurns?.FirstOrDefault(x => x.TurnNumber == currentTurn.TurnNumber);
+                if (gameTurn == null)
+                {
+                    serverGame.GameTurns.Add(currentTurn);
+                    gameTurn = currentTurn;
+                }
+                else
+                {
+                    gameTurn.Players[playerIndex] = playerTurn;
+                }
+                //Do market stuff if everyone is done with their turns
+                if (AllSubmittedTurn(gameTurn))
+                {
+                    //Decrease turn timer and reset old modules
+                    foreach (var module in gameTurn.MarketModules)
                     {
-                        var bidsInOrder = bid.OrderByDescending(x => x.SelectedModule.PlayerBid).ThenBy(x => x.ActionOrder).ToList();
-                        bidsInOrder[0].SelectedModule.PlayerBid = bidsInOrder[1].SelectedModule.PlayerBid;
-                        for (var i = 1; i < bidsInOrder.Count(); i++)
+                        if (module.TurnsLeft > 1)
                         {
-                            bidsInOrder[i].SelectedModule = null;
+                            module.MidBid--;
+                            module.TurnsLeft--;
+                        }
+                        else
+                        {
+                            var newModule = GetNewServerModule(serverGame.NumberOfModules);
+                            module.ModuleGuid = newModule.ModuleGuid;
+                            module.ModuleId = newModule.ModuleId;
+                            module.MidBid = newModule.MidBid;
+                            module.TurnsLeft = newModule.TurnsLeft;
+                        }
+                        module.PlayerBid = module.MidBid;
+                    }
+                    //Check on bid wars
+                    var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModule.ModuleGuid);
+                    foreach (var bid in bidGroup)
+                    {
+                        if (bid.Count() > 1)
+                        {
+                            var bidsInOrder = bid.OrderByDescending(x => x.SelectedModule.PlayerBid).ThenBy(x => x.ActionOrder).ToList();
+                            bidsInOrder[0].SelectedModule.PlayerBid = bidsInOrder[1].SelectedModule.PlayerBid;
+                            for (var i = 1; i < bidsInOrder.Count(); i++)
+                            {
+                                bidsInOrder[i].SelectedModule = null;
+                            }
+                        }
+                        else
+                        {
+                            bid.FirstOrDefault().SelectedModule.PlayerBid = bid.FirstOrDefault().SelectedModule.MidBid;
+                        }
+                        //reset bought module
+                        var module = gameTurn.MarketModules?.FirstOrDefault(x => x.ModuleGuid == bid.Key);
+                        //could have already been rotated out
+                        if (module != null)
+                        {
+                            var newModule = GetNewServerModule(serverGame.NumberOfModules);
+                            module.ModuleGuid = newModule.ModuleGuid;
+                            module.ModuleId = newModule.ModuleId;
+                            module.MidBid = newModule.MidBid;
+                            module.TurnsLeft = newModule.TurnsLeft;
                         }
                     }
-                    else
-                    {
-                        bid.FirstOrDefault().SelectedModule.PlayerBid = bid.FirstOrDefault().SelectedModule.MidBid;
-                    }
-                    //reset bought module
-                    var module = gameTurn.MarketModules?.FirstOrDefault(x => x.ModuleGuid == bid.Key);
-                    var newModule = GetNewServerModule(serverGame.NumberOfModules);
-                    module.ModuleGuid = newModule.ModuleGuid;
-                    module.ModuleId = newModule.ModuleId;
-                    module.MidBid = newModule.MidBid;
-                    module.TurnsLeft = newModule.TurnsLeft;
                 }
+            }
+            catch (Exception ex)
+            {
+                Debug.Print(ex.ToString());
+                SubmittingTurn = false;
+                return false;
             }
             SubmittingTurn = false;
             return true;
