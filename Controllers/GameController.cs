@@ -12,7 +12,6 @@ namespace SidusAPI.Controllers
     public class GameController : ControllerBase
     {
         private static List<GameMatch> ServerGames = new List<GameMatch>();
-        private static bool SubmittingTurn = false;
 
         [HttpGet]
         [Route("GetTurns")]
@@ -25,7 +24,7 @@ namespace SidusAPI.Controllers
                 do
                 {
                     var gameTurn = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid)?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                    if (!SubmittingTurn && gameTurn != null && AllSubmittedTurn(gameTurn))
+                    if (gameTurn != null && gameTurn.TurnIsOver)
                     {
                         return gameTurn;
                     }
@@ -48,19 +47,6 @@ namespace SidusAPI.Controllers
         [Route("EndTurn")]
         public bool EndTurn([FromBody] GameTurn currentTurn)
         {
-            Stopwatch timer = new Stopwatch();
-            timer.Start();
-            while (SubmittingTurn)
-            {
-                Thread.Sleep(250);
-                if (timer.Elapsed.TotalSeconds > 5)
-                {
-                    timer.Stop();
-                    return false;
-                }
-            }
-            timer.Stop();
-            SubmittingTurn = true;
             try
             {
                 GameMatch? serverGame = ServerGames.FirstOrDefault(x => x.GameGuid == currentTurn.GameGuid);
@@ -76,21 +62,21 @@ namespace SidusAPI.Controllers
                 }
                 if (serverGame == null || playerTurn == null || playerIndex == -1)
                 {
-                    SubmittingTurn = false;
                     return false;
                 }
                 GameTurn? gameTurn = serverGame.GameTurns?.FirstOrDefault(x => x.TurnNumber == currentTurn.TurnNumber);
                 if (gameTurn == null)
                 {
+                    currentTurn.TurnIsOver = false;
                     serverGame.GameTurns.Add(currentTurn);
                     gameTurn = currentTurn;
                 }
-                else
+                else if (!gameTurn.TurnIsOver)
                 {
                     gameTurn.Players[playerIndex] = playerTurn;
                 }
                 //Do market stuff if everyone is done with their turns
-                if (AllSubmittedTurn(gameTurn))
+                if (AllSubmittedTurn(gameTurn) && !gameTurn.TurnIsOver)
                 {
                     //Decrease turn timer and reset old modules
                     foreach (var module in gameTurn.MarketModules)
@@ -139,15 +125,14 @@ namespace SidusAPI.Controllers
                             module.TurnsLeft = newModule.TurnsLeft;
                         }
                     }
+                    gameTurn.TurnIsOver = true;
                 }
             }
             catch (Exception ex)
             {
                 Debug.Print(ex.ToString());
-                SubmittingTurn = false;
                 return false;
             }
-            SubmittingTurn = false;
             return true;
         }
 
@@ -158,8 +143,8 @@ namespace SidusAPI.Controllers
             {
                 ModuleGuid = Guid.NewGuid(),
                 ModuleId = rnd.Next(0, numMods),
-                MidBid = 6,
-                TurnsLeft = 5,
+                MidBid = 4,
+                TurnsLeft = 3,
             };
         }
 
@@ -172,6 +157,13 @@ namespace SidusAPI.Controllers
         [Route("FindGames")]
         public List<GameMatch> FindGames()
         {
+            for (int i = ServerGames.Count-1; i >= 0; i--)
+            {
+                if ((ServerGames[i].GameTurns[0]?.Players?.Any(y => y == null) ?? false) && ServerGames[i].HealthCheck < DateTime.Now.AddMinutes(-1))
+                {
+                    ServerGames.RemoveAt(i);
+                }
+            }
             return ServerGames.Where(x => (x.GameTurns[0]?.Players?.Any(y => y == null) ?? false)).ToList();
         } 
         
@@ -203,6 +195,7 @@ namespace SidusAPI.Controllers
             {
                 ClientGame.GameTurns[0].MarketModules.Add(GetNewServerModule(ClientGame.NumberOfModules));
             }
+            ClientGame.HealthCheck = DateTime.Now;
             ServerGames.Add(ClientGame);
             return ClientGame;
         }
@@ -219,6 +212,7 @@ namespace SidusAPI.Controllers
                 var startPlayers = game.GameTurns[0]?.Players?.Count(x => x != null);
                 while (timer.Elapsed.TotalSeconds < 10)
                 {
+                    game.HealthCheck = DateTime.Now;
                     var currentPlayers = game.GameTurns[0]?.Players?.Count(x => x != null);
                     if (startPlayers != currentPlayers || (game.GameTurns[0]?.Players?.All(x => x != null) ?? false))
                     {

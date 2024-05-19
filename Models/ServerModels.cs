@@ -8,6 +8,8 @@
         public Guid GameGuid { get; set; }
         public List<GameTurn>? GameTurns { get; set; }
         public List<string>? GameSettings { get; set; }
+        public bool GameIsOver { get; set; }
+        public DateTime HealthCheck { get; set; }
     }
 
     [Serializable]
@@ -17,6 +19,7 @@
         public int TurnNumber { get; set; }
         public List<ServerModule>? MarketModules { get; set; }
         public Player[]? Players { get; set; }
+        public bool TurnIsOver { get; set; }
     }
 
     [Serializable]
