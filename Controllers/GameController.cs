@@ -159,7 +159,7 @@ namespace SidusAPI.Controllers
         {
             for (int i = ServerGames.Count-1; i >= 0; i--)
             {
-                if ((ServerGames[i].GameTurns[0]?.Players?.Any(y => y == null) ?? false) && ServerGames[i].HealthCheck < DateTime.Now.AddMinutes(-1))
+                if ((ServerGames[i].GameTurns[0]?.Players?.Any(y => y == null) ?? false) && ServerGames[i].HealthCheck < DateTime.Now.AddSeconds(-15))
                 {
                     ServerGames.RemoveAt(i);
                 }
@@ -201,31 +201,34 @@ namespace SidusAPI.Controllers
         }
         
         [HttpGet]
-        [Route("HasGameStarted")]
-        public GameMatch? HasGameStarted(Guid GameGuid)
+        [Route("HasTakenTurn")]
+        public GameTurn? HasTakenTurn(Guid gameGuid, int turnNumber)
         {
-            Stopwatch timer = new Stopwatch();
-            timer.Start();
-            var game = ServerGames.FirstOrDefault(x => x.GameGuid == GameGuid);
+            var game = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid);
             if (game != null)
             {
-                var startPlayers = game.GameTurns[0]?.Players?.Count(x => x != null);
+                Stopwatch timer = new Stopwatch();
+                timer.Start();
+                var gameTurn = game?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
+                var startPlayers = gameTurn?.Players?.Count(x => x != null) ?? 0;
                 while (timer.Elapsed.TotalSeconds < 10)
                 {
                     game.HealthCheck = DateTime.Now;
-                    var currentPlayers = game.GameTurns[0]?.Players?.Count(x => x != null);
-                    if (startPlayers != currentPlayers || (game.GameTurns[0]?.Players?.All(x => x != null) ?? false))
+                    gameTurn = game?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
+                    var currentPlayers = gameTurn?.Players?.Count(x => x != null) ?? 0;
+                    if (startPlayers != currentPlayers || (gameTurn?.Players?.All(x => x != null) ?? false))
                     {
-                        return game;
+                        return gameTurn;
                     }
                     else
                     {
                         Thread.Sleep(250);
                     }
                 }
+                timer.Stop();
+                return gameTurn;
             }
-            timer.Stop();
-            return game;
+            return null;
         }
     }
 }
