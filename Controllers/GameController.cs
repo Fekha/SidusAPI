@@ -88,7 +88,7 @@ namespace SidusAPI.Controllers
                         }
                         else
                         {
-                            var newModule = GetNewServerModule(serverGame.NumberOfModules);
+                            var newModule = GetNewServerModule(gameTurn.ModulesForMarket, serverGame.NumberOfModules);
                             module.ModuleGuid = newModule.ModuleGuid;
                             module.ModuleId = newModule.ModuleId;
                             module.MidBid = newModule.MidBid;
@@ -118,7 +118,7 @@ namespace SidusAPI.Controllers
                         //could have already been rotated out
                         if (module != null)
                         {
-                            var newModule = GetNewServerModule(serverGame.NumberOfModules);
+                            var newModule = GetNewServerModule(gameTurn.ModulesForMarket, serverGame.NumberOfModules);
                             module.ModuleGuid = newModule.ModuleGuid;
                             module.ModuleId = newModule.ModuleId;
                             module.MidBid = newModule.MidBid;
@@ -136,15 +136,25 @@ namespace SidusAPI.Controllers
             return true;
         }
 
-        private ServerModule GetNewServerModule(int numMods)
+        private ServerModule GetNewServerModule(List<int> numMods, int maxNum)
         {
+            if (numMods.Count <= 0)
+            {
+                for (int i = 0; i <= maxNum; i++)
+                {
+                    numMods.Add(i);
+                }
+            }
             Random rnd = new Random();
+            int createIndex = rnd.Next(0, numMods.Count);
+            var moduleToCreate = numMods[createIndex];
+            numMods.RemoveAt(createIndex);
             return new ServerModule()
             {
                 ModuleGuid = Guid.NewGuid(),
-                ModuleId = rnd.Next(0, numMods),
-                MidBid = 4,
-                TurnsLeft = 3,
+                ModuleId = moduleToCreate,
+                MidBid = 6,
+                TurnsLeft = 4,
             };
         }
 
@@ -193,7 +203,7 @@ namespace SidusAPI.Controllers
             Random rnd = new Random();
             for (int i = 0; i < 2 + ClientGame.MaxPlayers; i++)
             {
-                ClientGame.GameTurns[0].MarketModules.Add(GetNewServerModule(ClientGame.NumberOfModules));
+                ClientGame.GameTurns[0].MarketModules.Add(GetNewServerModule(ClientGame.GameTurns[0].ModulesForMarket, ClientGame.NumberOfModules));
             }
             ClientGame.HealthCheck = DateTime.Now;
             ServerGames.Add(ClientGame);
