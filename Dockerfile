@@ -41,10 +41,10 @@ RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
 FROM mcr.microsoft.com/dotnet/aspnet:6.0-alpine AS final
 WORKDIR /app
 
-EXPOSE 7001
+EXPOSE 7002
 EXPOSE 80
 EXPOSE 443
-ENV ASPNETCORE_URLS=https://+:7001
+ENV ASPNETCORE_URLS=https://+:7002
 # Copy everything needed to run the app from the "build" stage.
 COPY --from=build /app .
 

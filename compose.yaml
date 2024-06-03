@@ -13,7 +13,7 @@ services:
   sidusapi:
     image: sidusapi-server
     ports:
-      - "7001:7001"
+      - "7002:7002"
     volumes:
       - /etc/letsencrypt/live/game.gravitas-games.com/fullchain.pem:/app/certificate/fullchain.pem
       - /etc/letsencrypt/live/game.gravitas-games.com/privkey.pem:/app/private-key/privkey.pem
