@@ -165,7 +165,7 @@ namespace SidusAPI.Controllers
 
         [HttpGet]
         [Route("FindGames")]
-        public List<GameMatch> FindGames()
+        public List<GameMatch> FindGames(Guid? playerGuid = null)
         {
             for (int i = ServerGames.Count-1; i >= 0; i--)
             {
@@ -174,6 +174,8 @@ namespace SidusAPI.Controllers
                     ServerGames.RemoveAt(i);
                 }
             }
+            if (playerGuid != null)
+                return ServerGames.Where(x => x.GameTurns.Count > 1 && (x.GameTurns[0]?.Players?.Any(x => x.Station.UnitGuid == playerGuid) ?? false)).ToList();
             return ServerGames.Where(x => (x.GameTurns[0]?.Players?.Any(y => y == null) ?? false)).ToList();
         } 
         
@@ -181,15 +183,22 @@ namespace SidusAPI.Controllers
         [Route("JoinGame")]
         public GameMatch? JoinGame(GameMatch ClientGame)
         {
-            GameMatch? matchToJoin = ServerGames.FirstOrDefault(x => x.GameGuid == ClientGame.GameGuid && (x.GameTurns[0]?.Players?.Any(y=> y == null) ?? false));
-            if (matchToJoin != null)
+            GameMatch? matchToJoin = ServerGames.FirstOrDefault(x => x.GameGuid == ClientGame.GameGuid);
+            if (matchToJoin != null && matchToJoin.GameTurns[0].Players != null)
             {
-                for (var i = (matchToJoin.GameTurns[0]?.Players?.Count()-1 ?? 0); i >= 0 ; i--) {
-                    if (matchToJoin.GameTurns[0]?.Players[i] == null)
+                if (matchToJoin.GameTurns[0]?.Players?.Any(y => y == null) ?? false)
+                {
+                    for (var i = (matchToJoin.GameTurns[0]?.Players?.Count() - 1 ?? 0); i >= 0; i--)
                     {
-                        matchToJoin.GameTurns[0].Players[i] = ClientGame.GameTurns[0].Players[1];
-                        return matchToJoin;
+                        if (matchToJoin.GameTurns[0]?.Players[i] == null)
+                        {
+                            matchToJoin.GameTurns[0].Players[i] = ClientGame.GameTurns[0].Players[1];
+                            return matchToJoin;
+                        }
                     }
+                }else if (matchToJoin.GameTurns[0]?.Players?.Where(x => x != null).Any(x => x.Station.UnitGuid == ClientGame.GameTurns[0].Players[1].Station.UnitGuid) ?? false)
+                {
+                    return matchToJoin;
                 }
             }
             return null;
