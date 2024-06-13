@@ -175,7 +175,7 @@ namespace SidusAPI.Controllers
                 }
             }
             if (playerGuid != null)
-                return ServerGames.Where(x => x.GameTurns.Count > 1 && (x.GameTurns[0]?.Players?.Any(x => x.Station.UnitGuid == playerGuid) ?? false)).ToList();
+                return ServerGames.Where(x => x.GameTurns.Count > 1 && x.GameTurns[0]?.Players?.Count() > 1 && (x.GameTurns[0]?.Players?.Any(x => x.Station.UnitGuid == playerGuid) ?? false)).ToList();
             return ServerGames.Where(x => (x.GameTurns[0]?.Players?.Any(y => y == null) ?? false)).ToList();
         } 
         
@@ -196,7 +196,7 @@ namespace SidusAPI.Controllers
                             return matchToJoin;
                         }
                     }
-                }else if (matchToJoin.GameTurns[0]?.Players?.Where(x => x != null).Any(x => x.Station.UnitGuid == ClientGame.GameTurns[0].Players[1].Station.UnitGuid) ?? false)
+                }else if (ClientGame.GameTurns[0]?.Players?.Count() > 1 && (matchToJoin.GameTurns[0]?.Players?.Where(x => x != null).Any(x => x.Station.UnitGuid == ClientGame.GameTurns[0].Players[1].Station.UnitGuid) ?? false)
                 {
                     return matchToJoin;
                 }

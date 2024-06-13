@@ -20,7 +20,21 @@
         public List<int>? ModulesForMarket { get; set; }
         public List<ServerModule>? MarketModules { get; set; }
         public Player[]? Players { get; set; }
+        public List<ServerModule>? AllModules { get; set; }
+        public List<ServerNode>? AllNodes { get; set; }
         public bool TurnIsOver { get; set; }
+    }
+
+    [Serializable]
+    public class ServerNode
+    {
+        public Guid UnitOnPath { get; set; }
+        public bool IsRift { get; set; }
+        public int MaxCredits { get; set; }
+        public int Minerals { get; set; }
+        public int CreditRegin { get; set; }
+        public int OwnedById { get; set; }
+        public ServerCoords? Coords { get; set; }
     }
 
 
