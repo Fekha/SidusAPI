@@ -227,7 +227,7 @@ namespace SidusAPI.Controllers
         {
             if(winner != -1)
                 ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid).Winner = winner;
-            return winner;
+            return ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid).Winner;
         }
 
         [HttpGet]
