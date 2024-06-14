@@ -8,7 +8,7 @@
         public Guid GameGuid { get; set; }
         public List<GameTurn>? GameTurns { get; set; }
         public List<string>? GameSettings { get; set; }
-        public bool GameIsOver { get; set; }
+        public int Winner { get; set; }
         public DateTime HealthCheck { get; set; }
     }
 

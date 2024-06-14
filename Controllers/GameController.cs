@@ -167,7 +167,7 @@ namespace SidusAPI.Controllers
         [Route("FindGames")]
         public List<GameMatch> FindGames(Guid? playerGuid = null)
         {
-            for (int i = ServerGames.Count-1; i >= 0; i--)
+            for (int i = ServerGames.Count - 1; i >= 0; i--)
             {
                 if ((ServerGames[i].GameTurns[0]?.Players?.Any(y => y == null) ?? false) && ServerGames[i].HealthCheck < DateTime.Now.AddSeconds(-15))
                 {
@@ -175,7 +175,7 @@ namespace SidusAPI.Controllers
                 }
             }
             if (playerGuid != null)
-                return ServerGames.Where(x => x.GameTurns.Count > 1 && x.GameTurns[0]?.Players?.Count() > 1 && (x.GameTurns[0]?.Players?.Any(x => x.Station.UnitGuid == playerGuid) ?? false)).ToList();
+                return ServerGames.Where(x => x.Winner == -1 && x.GameTurns.Count > 1 && x.GameTurns[0]?.Players?.Count() > 1 && (x.GameTurns[0]?.Players?.Any(x => x.Station.UnitGuid == playerGuid) ?? false)).ToList();
             return ServerGames.Where(x => (x.GameTurns[0]?.Players?.Any(y => y == null) ?? false)).ToList();
         } 
         
@@ -196,7 +196,8 @@ namespace SidusAPI.Controllers
                             return matchToJoin;
                         }
                     }
-                }else if (ClientGame.GameTurns[0]?.Players?.Count() > 1 && (matchToJoin.GameTurns[0]?.Players?.Where(x => x != null).Any(x => x.Station.UnitGuid == ClientGame.GameTurns[0].Players[1].Station.UnitGuid) ?? false)
+                }
+                else if (ClientGame.GameTurns[0]?.Players?.Count() > 1 && (matchToJoin.GameTurns[0]?.Players?.Where(x => x != null).Any(x => x.Station.UnitGuid == ClientGame.GameTurns[0].Players[1].Station.UnitGuid) ?? false))
                 {
                     return matchToJoin;
                 }
@@ -214,11 +215,21 @@ namespace SidusAPI.Controllers
             {
                 ClientGame.GameTurns[0].MarketModules.Add(GetNewServerModule(ClientGame.GameTurns[0].ModulesForMarket, ClientGame.NumberOfModules, (ClientGame.MaxPlayers == 1 ? 4 : ClientGame.MaxPlayers)));
             }
+            ClientGame.Winner = -1;
             ClientGame.HealthCheck = DateTime.Now;
             ServerGames.Add(ClientGame);
             return ClientGame;
         }
-        
+
+        [HttpGet]
+        [Route("EndGame")]
+        public int EndGame(Guid gameGuid, int winner)
+        {
+            if(winner != -1)
+                ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid).Winner = winner;
+            return winner;
+        }
+
         [HttpGet]
         [Route("HasTakenTurn")]
         public GameTurn? HasTakenTurn(Guid gameGuid, int turnNumber)
