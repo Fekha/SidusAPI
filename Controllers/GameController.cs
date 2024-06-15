@@ -175,7 +175,7 @@ namespace SidusAPI.Controllers
                 }
             }
             if (playerGuid != null)
-                return ServerGames.Where(x => x.Winner == -1 && x.GameTurns.Count > 1 && x.GameTurns[0]?.Players?.Count() > 1 && (x.GameTurns[0]?.Players?.Any(x => x.Station.UnitGuid == playerGuid) ?? false)).ToList();
+                return ServerGames.Where(x => x.Winner == -1 && x.GameTurns[0]?.Players?.Count() > 1 && (x.GameTurns[0]?.Players?.Any(x => x.Station.UnitGuid == playerGuid) ?? false)).ToList();
             return ServerGames.Where(x => (x.GameTurns[0]?.Players?.Any(y => y == null) ?? false)).ToList();
         } 
         
