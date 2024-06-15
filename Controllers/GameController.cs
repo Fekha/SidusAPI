@@ -169,7 +169,7 @@ namespace SidusAPI.Controllers
         {
             for (int i = ServerGames.Count - 1; i >= 0; i--)
             {
-                if ((ServerGames[i].GameTurns[0]?.Players?.Any(y => y == null) ?? false) && ServerGames[i].HealthCheck < DateTime.Now.AddSeconds(-15))
+                if ((ServerGames[i].GameTurns[0]?.Players?.Any(y => y == null) ?? false) && ServerGames[i].HealthCheck < DateTime.Now.AddHours(-24))
                 {
                     ServerGames.RemoveAt(i);
                 }
