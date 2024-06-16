@@ -51,7 +51,7 @@ namespace SidusAPI.Controllers
             {
                 GameMatch? serverGame = ServerGames.FirstOrDefault(x => x.GameGuid == currentTurn.GameGuid);
                 int playerIndex = -1;
-                Player? playerTurn = null;
+                GamePlayer? playerTurn = null;
                 for (int i = 0; i < currentTurn.Players?.Count(); i++)
                 {
                     if (currentTurn.Players[i] != null)
@@ -88,7 +88,7 @@ namespace SidusAPI.Controllers
                         }
                         else
                         {
-                            var newModule = GetNewServerModule(gameTurn.ModulesForMarket, serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers));
+                            var newModule = GetNewServerModule(GetIntListFromString(gameTurn.ModulesForMarket), serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers));
                             module.ModuleGuid = newModule.ModuleGuid;
                             module.ModuleId = newModule.ModuleId;
                             module.MidBid = newModule.MidBid;
@@ -118,7 +118,7 @@ namespace SidusAPI.Controllers
                         //could have already been rotated out
                         if (module != null)
                         {
-                            var newModule = GetNewServerModule(gameTurn.ModulesForMarket, serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers));
+                            var newModule = GetNewServerModule(GetIntListFromString(gameTurn.ModulesForMarket), serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers));
                             module.ModuleGuid = newModule.ModuleGuid;
                             module.ModuleId = newModule.ModuleId;
                             module.MidBid = newModule.MidBid;
@@ -213,14 +213,19 @@ namespace SidusAPI.Controllers
             Random rnd = new Random();
             for (int i = 0; i < (ClientGame.MaxPlayers == 1 ? 4 : ClientGame.MaxPlayers); i++)
             {
-                ClientGame.GameTurns[0].MarketModules.Add(GetNewServerModule(ClientGame.GameTurns[0].ModulesForMarket, ClientGame.NumberOfModules, (ClientGame.MaxPlayers == 1 ? 4 : ClientGame.MaxPlayers)));
+                ClientGame.GameTurns[0].MarketModules.Add(GetNewServerModule(GetIntListFromString(ClientGame.GameTurns[0].ModulesForMarket), ClientGame.NumberOfModules, (ClientGame.MaxPlayers == 1 ? 4 : ClientGame.MaxPlayers)));
             }
             ClientGame.Winner = -1;
             ClientGame.HealthCheck = DateTime.Now;
             ServerGames.Add(ClientGame);
             return ClientGame;
         }
-
+        public List<int> GetIntListFromString(string? csvString)
+        {
+            if(csvString == null)
+                return new List<int>();
+            return csvString.Split(",").Select(x => int.Parse(x)).ToList();
+        }
         [HttpGet]
         [Route("EndGame")]
         public int EndGame(Guid gameGuid, int winner)
