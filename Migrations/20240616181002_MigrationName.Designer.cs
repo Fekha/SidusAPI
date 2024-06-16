@@ -12,8 +12,8 @@ using SidusAPI.Data;
 namespace SidusAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20240616150948_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20240616181002_MigrationName")]
+    partial class MigrationName
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -88,24 +88,13 @@ namespace SidusAPI.Migrations
                     b.Property<string>("ModulesGuids")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid>("PlayerGuid")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("Score")
                         .HasColumnType("int");
 
-                    b.Property<Guid?>("StationGameGuid")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int?>("StationPlayerId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("StationTurnNumber")
-                        .HasColumnType("int");
-
-                    b.Property<Guid?>("StationUnitGuid")
-                        .HasColumnType("uniqueidentifier");
-
                     b.HasKey("GameGuid", "TurnNumber", "PlayerId");
-
-                    b.HasIndex("StationGameGuid", "StationTurnNumber", "StationPlayerId", "StationUnitGuid");
 
                     b.ToTable("Players");
                 });
@@ -164,11 +153,11 @@ namespace SidusAPI.Migrations
                     b.Property<Guid?>("SelectedUnitGuid")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int?>("X")
-                        .HasColumnType("int");
+                    b.Property<string>("XList")
+                        .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("Y")
-                        .HasColumnType("int");
+                    b.Property<string>("YList")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("GameGuid", "TurnNumber", "PlayerId", "ActionOrder");
 
@@ -327,11 +316,23 @@ namespace SidusAPI.Migrations
                     b.Property<int>("Facing")
                         .HasColumnType("int");
 
+                    b.Property<Guid?>("GamePlayerGameGuid")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("GamePlayerPlayerId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("GamePlayerTurnNumber")
+                        .HasColumnType("int");
+
                     b.Property<int>("GlobalCreditGain")
                         .HasColumnType("int");
 
                     b.Property<int>("HP")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsStation")
+                        .HasColumnType("bit");
 
                     b.Property<int>("KineticDamageModifier")
                         .HasColumnType("int");
@@ -386,6 +387,8 @@ namespace SidusAPI.Migrations
 
                     b.HasKey("GameGuid", "TurnNumber", "PlayerId", "UnitGuid");
 
+                    b.HasIndex("GamePlayerGameGuid", "GamePlayerTurnNumber", "GamePlayerPlayerId");
+
                     b.ToTable("ServerUnits");
                 });
 
@@ -396,12 +399,6 @@ namespace SidusAPI.Migrations
                         .HasForeignKey("GameGuid", "TurnNumber")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("SidusAPI.ServerModels.ServerUnit", "Station")
-                        .WithMany()
-                        .HasForeignKey("StationGameGuid", "StationTurnNumber", "StationPlayerId", "StationUnitGuid");
-
-                    b.Navigation("Station");
                 });
 
             modelBuilder.Entity("SidusAPI.ServerModels.GameTurn", b =>
@@ -454,10 +451,8 @@ namespace SidusAPI.Migrations
             modelBuilder.Entity("SidusAPI.ServerModels.ServerUnit", b =>
                 {
                     b.HasOne("SidusAPI.ServerModels.GamePlayer", null)
-                        .WithMany("Fleets")
-                        .HasForeignKey("GameGuid", "TurnNumber", "PlayerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .WithMany("Units")
+                        .HasForeignKey("GamePlayerGameGuid", "GamePlayerTurnNumber", "GamePlayerPlayerId");
                 });
 
             modelBuilder.Entity("SidusAPI.ServerModels.GameMatch", b =>
@@ -469,9 +464,9 @@ namespace SidusAPI.Migrations
                 {
                     b.Navigation("Actions");
 
-                    b.Navigation("Fleets");
-
                     b.Navigation("Technology");
+
+                    b.Navigation("Units");
                 });
 
             modelBuilder.Entity("SidusAPI.ServerModels.GameTurn", b =>

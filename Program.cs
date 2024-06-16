@@ -1,13 +1,12 @@
+
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using SidusAPI;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 builder.Services.AddControllers();
-//builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer("Server=data.gravitas-games.com, 1433;Database=SydusDB;User Id=SA;Password=Veersion101#;"));
+//builder.Services.AddDbContext<ApplicationDbContext>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -28,7 +27,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
 
 app.UseHttpsRedirection();
 

@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
 namespace SidusAPI.ServerModels
 {
@@ -21,7 +22,7 @@ namespace SidusAPI.ServerModels
         public int TurnNumber { get; set; }
         public string? ModulesForMarket { get; set; }
         public List<ServerModule>? MarketModules { get; set; }
-        public GamePlayer[]? Players { get; set; }
+        public List<GamePlayer>? Players { get; set; }
         public string? AllModules { get; set; }
         public List<ServerNode>? AllNodes { get; set; }
         public bool TurnIsOver { get; set; }
@@ -34,7 +35,6 @@ namespace SidusAPI.ServerModels
         public int TurnNumber { get; set; }
         public int? X { get; set; }
         public int? Y { get; set; }
-        public Guid UnitOnPath { get; set; }
         public bool IsRift { get; set; }
         public int MaxCredits { get; set; }
         public int Minerals { get; set; }
@@ -47,10 +47,10 @@ namespace SidusAPI.ServerModels
     public class GamePlayer
     {
         public Guid GameGuid { get; set; }
+        public Guid PlayerGuid { get; set; }
         public int TurnNumber { get; set; }
         public int PlayerId { get; set; }
-        public ServerUnit? Station { get; set; }
-        public List<ServerUnit>? Fleets { get; set; }
+        public List<ServerUnit>? Units { get; set; }
         public List<ServerAction>? Actions { get; set; }
         public List<ServerTechnology>? Technology { get; set; }
         public string? ModulesGuids { get; set; }
@@ -89,8 +89,8 @@ namespace SidusAPI.ServerModels
         public int ActionOrder { get; set; }
         public int? ActionTypeId { get; set; }
         public Guid? SelectedUnitGuid { get; set; }
-        public int? X { get; set; }
-        public int? Y { get; set; }
+        public string? XList { get; set; }
+        public string? YList { get; set; }
         public ServerModule? SelectedModule { get; set; }
         public Guid? GeneratedGuid { get; set; }
     }
@@ -98,6 +98,7 @@ namespace SidusAPI.ServerModels
     [Serializable]
     public class ServerUnit
     {
+        public bool IsStation { get; set; }
         public Guid GameGuid { get; set; }
         public int TurnNumber { get; set; }
         public int PlayerId { get; set; }

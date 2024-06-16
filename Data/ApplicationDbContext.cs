@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SidusAPI.ServerModels;
 
-namespace SidusAPI
+namespace SidusAPI.Data
 {
     public class ApplicationDbContext : DbContext
     {
@@ -11,7 +11,7 @@ namespace SidusAPI
         public DbSet<GameMatch> GameMatches { get; set; }
         public DbSet<GameTurn> GameTurns { get; set; }
         public DbSet<ServerNode> ServerNodes { get; set; }
-        public DbSet<GamePlayer> Players { get; set; }
+        public DbSet<GamePlayer> GamePlayers { get; set; }
         public DbSet<ServerTechnology> ServerTechnologies { get; set; }
         public DbSet<ServerAction> ServerActions { get; set; }
         public DbSet<ServerUnit> ServerUnits { get; set; }
@@ -20,7 +20,8 @@ namespace SidusAPI
         {
             if (!optionsBuilder.IsConfigured)
             {
-                optionsBuilder.UseSqlServer("Server=data.gravitas-games.com, 1433;Database=SydusDB;User Id=SA;Password=Veersion101#;");
+                optionsBuilder.UseSqlServer("Server=data.gravitas-games.com, 1433;Database=SydusDB;User Id=SA;Password=Veersion101#;")
+                   .EnableSensitiveDataLogging(true);
             }
         }
         protected override void OnModelCreating(ModelBuilder modelBuilder)

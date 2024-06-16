@@ -1,16 +1,19 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using SidusAPI.Data;
 using SidusAPI.ServerModels;
 namespace SidusAPI.Controllers
 {
-    public class LoginController
+    [ApiController]
+    [Route("api/[controller]")]
+    public class LoginController : ControllerBase
     {
         [HttpGet]
-        [Route("GetGameMatch")]
-        public GameMatch? GetGameMatch(Guid gameGuid)
+        [Route("[action]")]
+        public void Test()
         {
             using (var context = new ApplicationDbContext())
             {
-                return context.GameMatches?.FirstOrDefault(x => x.GameGuid == gameGuid);
+                
             }
         }
     }
