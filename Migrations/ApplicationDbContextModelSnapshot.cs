@@ -145,6 +145,9 @@ namespace SidusAPI.Migrations
                     b.Property<Guid?>("SelectedModuleModuleGuid")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("SelectedModulePlayerGuid")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int?>("SelectedModuleTurnNumber")
                         .HasColumnType("int");
 
@@ -159,7 +162,7 @@ namespace SidusAPI.Migrations
 
                     b.HasKey("GameGuid", "TurnNumber", "PlayerId", "ActionOrder");
 
-                    b.HasIndex("SelectedModuleGameGuid", "SelectedModuleTurnNumber", "SelectedModuleModuleGuid");
+                    b.HasIndex("SelectedModuleGameGuid", "SelectedModuleTurnNumber", "SelectedModuleModuleGuid", "SelectedModulePlayerGuid");
 
                     b.ToTable("ServerActions");
                 });
@@ -172,7 +175,10 @@ namespace SidusAPI.Migrations
                     b.Property<int>("TurnNumber")
                         .HasColumnType("int");
 
-                    b.Property<Guid?>("ModuleGuid")
+                    b.Property<Guid>("ModuleGuid")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PlayerGuid")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("MidBid")
@@ -187,7 +193,7 @@ namespace SidusAPI.Migrations
                     b.Property<int>("TurnsLeft")
                         .HasColumnType("int");
 
-                    b.HasKey("GameGuid", "TurnNumber", "ModuleGuid");
+                    b.HasKey("GameGuid", "TurnNumber", "ModuleGuid", "PlayerGuid");
 
                     b.ToTable("ServerModules");
                 });
@@ -415,7 +421,7 @@ namespace SidusAPI.Migrations
 
                     b.HasOne("SidusAPI.ServerModels.ServerModule", "SelectedModule")
                         .WithMany()
-                        .HasForeignKey("SelectedModuleGameGuid", "SelectedModuleTurnNumber", "SelectedModuleModuleGuid");
+                        .HasForeignKey("SelectedModuleGameGuid", "SelectedModuleTurnNumber", "SelectedModuleModuleGuid", "SelectedModulePlayerGuid");
 
                     b.Navigation("SelectedModule");
                 });

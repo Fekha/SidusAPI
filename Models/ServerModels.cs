@@ -12,6 +12,7 @@ namespace SidusAPI.ServerModels
         public List<GameTurn>? GameTurns { get; set; }
         public string? GameSettings { get; set; }
         public int Winner { get; set; }
+        public bool IsDeleted { get; set; }
         public DateTime HealthCheck { get; set; }
     }
 
@@ -21,9 +22,9 @@ namespace SidusAPI.ServerModels
         public Guid GameGuid { get; set; }
         public int TurnNumber { get; set; }
         public string? ModulesForMarket { get; set; }
-        public List<ServerModule>? MarketModules { get; set; }
+        public string? MarketModuleGuids { get; set; }
         public List<GamePlayer>? Players { get; set; }
-        public string? AllModules { get; set; }
+        public List<ServerModule>? AllModules { get; set; }
         public List<ServerNode>? AllNodes { get; set; }
         public bool TurnIsOver { get; set; }
     }
@@ -91,7 +92,7 @@ namespace SidusAPI.ServerModels
         public Guid? SelectedUnitGuid { get; set; }
         public string? XList { get; set; }
         public string? YList { get; set; }
-        public ServerModule? SelectedModule { get; set; }
+        public Guid? SelectedModuleGuid { get; set; }
         public Guid? GeneratedGuid { get; set; }
     }
 
@@ -134,7 +135,7 @@ namespace SidusAPI.ServerModels
     {
         public Guid GameGuid { get; set; }
         public int TurnNumber { get; set; }
-        public Guid? ModuleGuid { get; set; }
+        public Guid ModuleGuid { get; set; }
         public int ModuleId { get; set; }
         public int MidBid { get; set; }
         public int PlayerBid { get; set; }

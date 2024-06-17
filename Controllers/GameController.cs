@@ -36,7 +36,7 @@ namespace SidusAPI.Controllers
                                 .ThenInclude(gt => gt.Players)
                                     .ThenInclude(p => p.Technology)
                             .Include(gm => gm.GameTurns)
-                                .ThenInclude(gt => gt.MarketModules)
+                                .ThenInclude(gt => gt.MarketModuleGuids)
                             .Include(gm => gm.GameTurns)
                                 .ThenInclude(gt => gt.AllNodes)
                             .FirstOrDefault(x => x.GameGuid == gameGuid)?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
@@ -79,7 +79,7 @@ namespace SidusAPI.Controllers
                             .ThenInclude(gt => gt.Players)
                                 .ThenInclude(p => p.Technology)
                         .Include(gm => gm.GameTurns)
-                            .ThenInclude(gt => gt.MarketModules)
+                            .ThenInclude(gt => gt.MarketModuleGuids)
                         .Include(gm => gm.GameTurns)
                             .ThenInclude(gt => gt.AllNodes)
                         .FirstOrDefault(x => x.GameGuid == currentTurn.GameGuid);
@@ -111,23 +111,28 @@ namespace SidusAPI.Controllers
                     if (gameTurn.Players?.Count() == serverGame.MaxPlayers && !gameTurn.TurnIsOver)
                     {
                         //Decrease turn timer and reset old modules
-                        for(int i = gameTurn.MarketModules.Count()-1; i >= 0 ;i--)
+                        foreach (var module in gameTurn.MarketModuleGuids)
                         {
-                            if (gameTurn.MarketModules[i].TurnsLeft > 1)
+                            if (module.TurnsLeft > 1)
                             {
-                                gameTurn.MarketModules[i].TurnNumber++;
-                                gameTurn.MarketModules[i].TurnsLeft--;
-                                gameTurn.MarketModules[i].MidBid = (gameTurn.MarketModules[i].TurnsLeft * 2) + 1;
-                                gameTurn.MarketModules[i].PlayerBid = gameTurn.MarketModules[i].MidBid;
+                                module.TurnNumber++;
+                                module.TurnsLeft--;
+                                module.MidBid = (module.TurnsLeft * 2) + 1;
                             }
                             else
                             {
-                                gameTurn.MarketModules.Remove(gameTurn.MarketModules[i]);
-                                gameTurn.MarketModules.Add(GetNewServerModule(GetIntListFromString(gameTurn.ModulesForMarket), serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers), gameTurn.GameGuid, gameTurn.TurnNumber+1));
+                                var newModule = GetNewServerModule(GetIntListFromString(gameTurn.ModulesForMarket), serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers), gameTurn.GameGuid, gameTurn.TurnNumber+1);
+                                module.ModuleGuid = newModule.ModuleGuid;
+                                module.ModuleId = newModule.ModuleId;
+                                module.MidBid = newModule.MidBid;
+                                module.TurnsLeft = newModule.TurnsLeft;
+                                module.TurnNumber = newModule.TurnNumber;
+                                module.GameGuid = newModule.GameGuid;
                             }
+                            module.PlayerBid = module.MidBid;
                         }
                         //Check on bid wars
-                        var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModule.ModuleGuid);
+                        var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModuleGuid.ModuleGuid);
                         foreach (var bid in bidGroup)
                         {
                             if (bid.Count() > 1)
@@ -144,12 +149,17 @@ namespace SidusAPI.Controllers
                                 bid.FirstOrDefault().SelectedModule.PlayerBid = bid.FirstOrDefault().SelectedModule.MidBid;
                             }
                             //reset bought module
-                            var module = gameTurn.MarketModules?.FirstOrDefault(x => x.ModuleGuid == bid.Key);
+                            var module = gameTurn.MarketModuleGuids?.FirstOrDefault(x => x.ModuleGuid == bid.Key);
                             //could have already been rotated out
                             if (module != null)
                             {
-                                gameTurn.MarketModules.Remove(module);
-                                gameTurn.MarketModules.Add(GetNewServerModule(GetIntListFromString(gameTurn.ModulesForMarket), serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers), gameTurn.GameGuid, gameTurn.TurnNumber + 1));
+                                var newModule = GetNewServerModule(GetIntListFromString(gameTurn.ModulesForMarket), serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers), gameTurn.GameGuid, gameTurn.TurnNumber);
+                                module.ModuleGuid = newModule.ModuleGuid;
+                                module.ModuleId = newModule.ModuleId;
+                                module.MidBid = newModule.MidBid;
+                                module.TurnsLeft = newModule.TurnsLeft;
+                                module.TurnNumber = newModule.TurnNumber;
+                                module.GameGuid = newModule.GameGuid;
                             }
                         }
                         gameTurn.TurnIsOver = true;
@@ -186,7 +196,6 @@ namespace SidusAPI.Controllers
                 ModuleId = moduleToCreate,
                 TurnsLeft = maxTurns,
                 MidBid = (maxTurns * 2) + 1,
-                PlayerBid = (maxTurns * 2) + 1,
             };
         }
 
@@ -196,24 +205,18 @@ namespace SidusAPI.Controllers
         {
             using (var context = new ApplicationDbContext())
             {
-                var gamesToRemove = context.GameMatches
+                var serverGames = context.GameMatches
                     .Include(gm => gm.GameTurns)
-                    .ThenInclude(gt => gt.Players)
-                    .Where(x => x.GameTurns[0].Players.Count() < x.MaxPlayers && x.HealthCheck < DateTime.Now.AddHours(-24)).ToList();
-                for (int i = gamesToRemove.Count()-1; i >= 0; i--)
+                    .ThenInclude(gt => gt.Players).Where(x => !x.IsDeleted && x.GameTurns.Count > 0);
+                var gamesToRemove = serverGames.Where(x => x.GameTurns[0].Players.Count() < x.MaxPlayers && x.HealthCheck < DateTime.Now.AddHours(-24)).ToList();
+                foreach(var game in gamesToRemove)
                 {
-                    context.GameMatches.Remove(gamesToRemove[i]);
+                    game.IsDeleted = true;
                 }
                 context.SaveChanges();
                 if (playerGuid != null)
-                    return context.GameMatches
-                        .Include(gm => gm.GameTurns)
-                        .ThenInclude(gt => gt.Players)
-                        .Where(x => x.Winner == -1 && x.GameTurns[0].Players.Count() > 1 && (x.GameTurns[0].Players.Any(x => x.PlayerGuid == playerGuid))).ToList();
-                return context.GameMatches
-                    .Include(gm => gm.GameTurns)
-                    .ThenInclude(gt => gt.Players)
-                    .Where(x => x.GameTurns[0].Players.Count() < x.MaxPlayers).ToList();
+                    return serverGames.Where(x => x.Winner == -1 && x.GameTurns[0].Players.Count() > 1 && (x.GameTurns[0].Players.Any(x => x.PlayerGuid == playerGuid))).ToList();
+                return serverGames.Where(x => x.GameTurns[0].Players.Count() < x.MaxPlayers).ToList();
             }
         } 
         
@@ -234,7 +237,7 @@ namespace SidusAPI.Controllers
                         .ThenInclude(gt => gt.Players)
                             .ThenInclude(p => p.Technology)
                     .Include(gm => gm.GameTurns)
-                        .ThenInclude(gt => gt.MarketModules)
+                        .ThenInclude(gt => gt.MarketModuleGuids)
                     .Include(gm => gm.GameTurns)
                     .ThenInclude(gt => gt.AllNodes)
                     .FirstOrDefault(x => x.GameGuid == ClientGame.GameGuid);
@@ -266,10 +269,14 @@ namespace SidusAPI.Controllers
         {
             ClientGame.GameGuid = ClientGame.GameGuid;
             Random rnd = new Random();
+            List<Guid> newModules = new List<Guid>();
             for (int i = 0; i < (ClientGame.MaxPlayers == 1 ? 4 : ClientGame.MaxPlayers); i++)
             {
-                ClientGame.GameTurns[0].MarketModules.Add(GetNewServerModule(GetIntListFromString(ClientGame.GameTurns[0].ModulesForMarket), ClientGame.NumberOfModules, (ClientGame.MaxPlayers == 1 ? 4 : ClientGame.MaxPlayers), ClientGame.GameGuid, 0));
+                var newModule = GetNewServerModule(GetIntListFromString(ClientGame.GameTurns[0].ModulesForMarket), ClientGame.NumberOfModules, (ClientGame.MaxPlayers == 1 ? 4 : ClientGame.MaxPlayers), ClientGame.GameGuid, 0);
+                ClientGame.GameTurns[0].AllModules.Add(newModule);
+                newModules.Add(newModule.ModuleGuid);
             }
+            ClientGame.GameTurns[0].MarketModuleGuids = String.Join(",", newModules);
             ClientGame.Winner = -1;
             ClientGame.HealthCheck = DateTime.Now;
             using (var context = new ApplicationDbContext())
