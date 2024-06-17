@@ -93,7 +93,6 @@ namespace SidusAPI.Controllers
                     {
                         currentTurn.TurnIsOver = false;
                         serverGame.GameTurns.Add(currentTurn);
-                        gameTurn = currentTurn;
                     }
                     else if (!gameTurn.TurnIsOver)
                     {
@@ -107,12 +106,14 @@ namespace SidusAPI.Controllers
                             gameTurn.Players[submittedTurn.PlayerId] = playerTurn;
                         }
                     }
+                    gameTurn = serverGame.GameTurns.FirstOrDefault(x => x.TurnNumber == currentTurn.TurnNumber);
                     //Do market stuff if everyone is done with their turns
                     if (gameTurn.Players?.Count() == serverGame.MaxPlayers && !gameTurn.TurnIsOver)
                     {
                         //Decrease turn timer and reset old modules
-                        foreach (var module in gameTurn.MarketModuleGuids)
+                        foreach (var moduleGuid in gameTurn.MarketModuleGuids.Split(","))
                         {
+                            var module = gameTurn.AllModules.FirstOrDefault(x => x.ModuleGuid == Guid.Parse(moduleGuid));
                             if (module.TurnsLeft > 1)
                             {
                                 module.TurnNumber++;
@@ -122,6 +123,7 @@ namespace SidusAPI.Controllers
                             else
                             {
                                 var newModule = GetNewServerModule(GetIntListFromString(gameTurn.ModulesForMarket), serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers), gameTurn.GameGuid, gameTurn.TurnNumber+1);
+                                gameTurn.MarketModuleGuids.Replace(moduleGuid, newModule.ModuleGuid.ToString());
                                 module.ModuleGuid = newModule.ModuleGuid;
                                 module.ModuleId = newModule.ModuleId;
                                 module.MidBid = newModule.MidBid;
@@ -129,31 +131,30 @@ namespace SidusAPI.Controllers
                                 module.TurnNumber = newModule.TurnNumber;
                                 module.GameGuid = newModule.GameGuid;
                             }
-                            module.PlayerBid = module.MidBid;
                         }
                         //Check on bid wars
-                        var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModuleGuid.ModuleGuid);
+                        var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModuleGuid);
                         foreach (var bid in bidGroup)
                         {
+                            var module = gameTurn.AllModules.FirstOrDefault(x => x.ModuleGuid == bid.Key);
                             if (bid.Count() > 1)
                             {
-                                var bidsInOrder = bid.OrderByDescending(x => x.SelectedModule.PlayerBid).ThenBy(x => x.ActionOrder).ToList();
-                                bidsInOrder[0].SelectedModule.PlayerBid = bidsInOrder[1].SelectedModule.PlayerBid;
+                                var bidsInOrder = bid.OrderByDescending(x => x.PlayerBid).ThenBy(x => x.ActionOrder).ToList();
+                                bidsInOrder[0].PlayerBid = bidsInOrder[1].PlayerBid;
                                 for (var i = 1; i < bidsInOrder.Count(); i++)
                                 {
-                                    bidsInOrder[i].SelectedModule = null;
+                                    bidsInOrder[i].SelectedModuleGuid = null;
                                 }
                             }
                             else
                             {
-                                bid.FirstOrDefault().SelectedModule.PlayerBid = bid.FirstOrDefault().SelectedModule.MidBid;
+                                bid.FirstOrDefault().PlayerBid = module.MidBid;
                             }
-                            //reset bought module
-                            var module = gameTurn.MarketModuleGuids?.FirstOrDefault(x => x.ModuleGuid == bid.Key);
                             //could have already been rotated out
                             if (module != null)
                             {
                                 var newModule = GetNewServerModule(GetIntListFromString(gameTurn.ModulesForMarket), serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers), gameTurn.GameGuid, gameTurn.TurnNumber);
+                                gameTurn.MarketModuleGuids.Replace(module.ModuleGuid.ToString(), newModule.ModuleGuid.ToString());
                                 module.ModuleGuid = newModule.ModuleGuid;
                                 module.ModuleId = newModule.ModuleId;
                                 module.MidBid = newModule.MidBid;
