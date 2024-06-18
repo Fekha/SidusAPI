@@ -35,7 +35,7 @@ namespace SidusAPI.Data
             modelBuilder.Entity<ServerTechnology>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerId, gt.TechnologyId });
             modelBuilder.Entity<ServerAction>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerId, gt.ActionOrder });
             modelBuilder.Entity<ServerUnit>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerId, gt.UnitGuid });
-            modelBuilder.Entity<ServerModule>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.ModuleGuid, gt.PlayerGuid });
+            modelBuilder.Entity<ServerModule>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.ModuleGuid });
         }
     }
 }

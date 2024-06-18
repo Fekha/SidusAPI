@@ -34,6 +34,9 @@ namespace SidusAPI.Migrations
                     b.Property<DateTime>("HealthCheck")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<int>("MaxPlayers")
                         .HasColumnType("int");
 
@@ -105,7 +108,7 @@ namespace SidusAPI.Migrations
                     b.Property<int>("TurnNumber")
                         .HasColumnType("int");
 
-                    b.Property<string>("AllModules")
+                    b.Property<string>("MarketModuleGuids")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ModulesForMarket")
@@ -136,20 +139,23 @@ namespace SidusAPI.Migrations
                     b.Property<int?>("ActionTypeId")
                         .HasColumnType("int");
 
+                    b.Property<Guid?>("GamePlayerGameGuid")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("GamePlayerPlayerId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("GamePlayerTurnNumber")
+                        .HasColumnType("int");
+
                     b.Property<Guid?>("GeneratedGuid")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("SelectedModuleGameGuid")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("SelectedModuleModuleGuid")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("SelectedModulePlayerGuid")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int?>("SelectedModuleTurnNumber")
+                    b.Property<int?>("PlayerBid")
                         .HasColumnType("int");
+
+                    b.Property<Guid?>("SelectedModuleGuid")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("SelectedUnitGuid")
                         .HasColumnType("uniqueidentifier");
@@ -162,7 +168,7 @@ namespace SidusAPI.Migrations
 
                     b.HasKey("GameGuid", "TurnNumber", "PlayerId", "ActionOrder");
 
-                    b.HasIndex("SelectedModuleGameGuid", "SelectedModuleTurnNumber", "SelectedModuleModuleGuid", "SelectedModulePlayerGuid");
+                    b.HasIndex("GamePlayerGameGuid", "GamePlayerTurnNumber", "GamePlayerPlayerId");
 
                     b.ToTable("ServerActions");
                 });
@@ -178,8 +184,11 @@ namespace SidusAPI.Migrations
                     b.Property<Guid>("ModuleGuid")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("PlayerGuid")
+                    b.Property<Guid?>("GameTurnGameGuid")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("GameTurnTurnNumber")
+                        .HasColumnType("int");
 
                     b.Property<int>("MidBid")
                         .HasColumnType("int");
@@ -187,13 +196,12 @@ namespace SidusAPI.Migrations
                     b.Property<int>("ModuleId")
                         .HasColumnType("int");
 
-                    b.Property<int>("PlayerBid")
-                        .HasColumnType("int");
-
                     b.Property<int>("TurnsLeft")
                         .HasColumnType("int");
 
-                    b.HasKey("GameGuid", "TurnNumber", "ModuleGuid", "PlayerGuid");
+                    b.HasKey("GameGuid", "TurnNumber", "ModuleGuid");
+
+                    b.HasIndex("GameTurnGameGuid", "GameTurnTurnNumber");
 
                     b.ToTable("ServerModules");
                 });
@@ -415,24 +423,14 @@ namespace SidusAPI.Migrations
                 {
                     b.HasOne("SidusAPI.ServerModels.GamePlayer", null)
                         .WithMany("Actions")
-                        .HasForeignKey("GameGuid", "TurnNumber", "PlayerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SidusAPI.ServerModels.ServerModule", "SelectedModule")
-                        .WithMany()
-                        .HasForeignKey("SelectedModuleGameGuid", "SelectedModuleTurnNumber", "SelectedModuleModuleGuid", "SelectedModulePlayerGuid");
-
-                    b.Navigation("SelectedModule");
+                        .HasForeignKey("GamePlayerGameGuid", "GamePlayerTurnNumber", "GamePlayerPlayerId");
                 });
 
             modelBuilder.Entity("SidusAPI.ServerModels.ServerModule", b =>
                 {
                     b.HasOne("SidusAPI.ServerModels.GameTurn", null)
-                        .WithMany("MarketModules")
-                        .HasForeignKey("GameGuid", "TurnNumber")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .WithMany("AllModules")
+                        .HasForeignKey("GameTurnGameGuid", "GameTurnTurnNumber");
                 });
 
             modelBuilder.Entity("SidusAPI.ServerModels.ServerNode", b =>
@@ -472,9 +470,9 @@ namespace SidusAPI.Migrations
 
             modelBuilder.Entity("SidusAPI.ServerModels.GameTurn", b =>
                 {
-                    b.Navigation("AllNodes");
+                    b.Navigation("AllModules");
 
-                    b.Navigation("MarketModules");
+                    b.Navigation("AllNodes");
 
                     b.Navigation("Players");
                 });
