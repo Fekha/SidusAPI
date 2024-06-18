@@ -96,6 +96,8 @@ namespace SidusAPI.Controllers
                 {
                     currentTurn.TurnIsOver = false;
                     serverGame.GameTurns.Add(currentTurn);
+                    gameTurn = currentTurn;
+                    UpdateDBCreateTurn(gameTurn);
                 }
                 else if (!gameTurn.TurnIsOver)
                 {
@@ -108,13 +110,12 @@ namespace SidusAPI.Controllers
                     {
                         gameTurn.Players[submittedTurn.PlayerId] = playerTurn;
                     }
+                    UpdateDBAddPlayer(playerTurn);
                 }
-                gameTurn = serverGame.GameTurns.FirstOrDefault(x => x.TurnNumber == currentTurn.TurnNumber);
                 //Do market stuff if everyone is done with their turns
                 if (gameTurn.Players?.Count() == serverGame.MaxPlayers && !gameTurn.TurnIsOver)
                 {
                     var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModuleGuid);
-
                     //Decrease turn timer and reset old modules
                     foreach (var moduleGuid in gameTurn.MarketModuleGuids.Split(",").Select(x => Guid.Parse(x)))
                     {
@@ -313,16 +314,30 @@ namespace SidusAPI.Controllers
         {
             using (var context = new ApplicationDbContext())
             {
-                context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid).HealthCheck = healthCheck;
-                await context.SaveChangesAsync();
+                try
+                {
+                    context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid).HealthCheck = healthCheck;
+                    await context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print(ex.ToString());
+                }
             }
         }
         private async Task UpdateDBCreateGame(GameMatch newGame)
         {
             using (var context = new ApplicationDbContext())
             {
-                context.GameMatches.Add(newGame);
-                await context.SaveChangesAsync();
+                try
+                {
+                    context.GameMatches.Add(newGame);
+                    await context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print(ex.ToString());
+                }
             }
         }
 
@@ -330,22 +345,57 @@ namespace SidusAPI.Controllers
         {
             using (var context = new ApplicationDbContext())
             {
-                context.GameTurns.Add(gameTurn);
-                await context.SaveChangesAsync();
+                try {
+                    var turn = context.GameTurns.FirstOrDefault(x => x.GameGuid == gameTurn.GameGuid && x.TurnNumber == gameTurn.TurnNumber);
+                    if (turn == null)
+                    {
+                        context.GameTurns.Add(gameTurn);
+                    }
+                    else
+                    {
+                        turn = gameTurn;
+                    }
+                    await context.SaveChangesAsync();
+                }
+                catch(Exception ex)
+                {
+                    Debug.Print(ex.ToString());
+                }
             }
         }
 
         private async Task UpdateDBSave(ApplicationDbContext context)
         {
-            await context.SaveChangesAsync();
+            try{
+                await context.SaveChangesAsync();
+            }
+            catch(Exception ex)
+            {
+                Debug.Print(ex.ToString());
+            }
         }
 
         private async Task UpdateDBAddPlayer(GamePlayer newPlayer)
         {
             using (var context = new ApplicationDbContext())
             {
-                context.GamePlayers.Add(newPlayer);
-                await context.SaveChangesAsync();
+                try
+                {
+                    var gamePlayer = context.GamePlayers.FirstOrDefault(x => x.GameGuid == newPlayer.GameGuid && x.TurnNumber == newPlayer.TurnNumber && x.PlayerId == newPlayer.PlayerId);
+                    if (gamePlayer == null)
+                    {
+                        context.GamePlayers.Add(newPlayer);
+                    }
+                    else
+                    {
+                        gamePlayer = newPlayer;
+                    }
+                    await context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print(ex.ToString());
+                }
             }
         }
     }
