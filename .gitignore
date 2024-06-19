@@ -19,7 +19,7 @@ x64/
 # MSTest test Results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
-
+Migrations/
 *_i.c
 *_p.c
 *_i.h

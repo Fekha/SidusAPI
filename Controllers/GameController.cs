@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using SidusAPI.Data;
 using SidusAPI.ServerModels;
 using System;
 using System.Collections.Generic;
@@ -17,30 +19,64 @@ namespace SidusAPI.Controllers
         [Route("GetTurns")]
         public GameTurn? GetTurns(Guid gameGuid, int turnNumber, bool quickSearch)
         {
-            try
+            using (var context = new ApplicationDbContext())
             {
-                Stopwatch timer = new Stopwatch();
-                timer.Start();
-                do
+                try
                 {
-                    var gameTurn = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid)?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                    if (gameTurn != null && gameTurn.TurnIsOver)
+                    Stopwatch timer = new Stopwatch();
+                    timer.Start();
+                    do
                     {
-                        return gameTurn;
-                    }
-                    else if (!quickSearch)
-                    {
-                        Thread.Sleep(250);
-                    }
-                } while (timer.Elapsed.TotalSeconds < 10 && !quickSearch);
-                timer.Stop();
-            }
-            catch (Exception ex)
-            {
-                Debug.Print(ex.ToString());
+                        var gameTurn = GetServerMatch(gameGuid).GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
+                        if (gameTurn != null && gameTurn.TurnIsOver)
+                        {
+                            return gameTurn;
+                        }
+                        else if (!quickSearch)
+                        {
+                            Thread.Sleep(250);
+                        }
+                    } while (timer.Elapsed.TotalSeconds < 10 && !quickSearch);
+                    timer.Stop();
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print(ex.ToString());
+                    return null;
+                }
                 return null;
             }
-            return null;
+        }
+
+        private GameMatch GetServerMatch(Guid gameGuid)
+        {
+            var game = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid);
+            if(game == null)
+            {
+                using (var context = new ApplicationDbContext())
+                {
+                    game = context.GameMatches
+                        .Include(gm => gm.GameTurns)
+                            .ThenInclude(gt => gt.Players)
+                                .ThenInclude(p => p.Units)
+                        .Include(gm => gm.GameTurns)
+                            .ThenInclude(gt => gt.Players)
+                                .ThenInclude(p => p.Actions)
+                        .Include(gm => gm.GameTurns)
+                            .ThenInclude(gt => gt.Players)
+                                .ThenInclude(p => p.Technology)
+                        .Include(gm => gm.GameTurns)
+                            .ThenInclude(gt => gt.AllNodes)
+                        .Include(gm => gm.GameTurns)
+                            .ThenInclude(gt => gt.AllModules)
+                        .FirstOrDefault(x => x.GameGuid == gameGuid);
+                    if (game != null)
+                    {
+                        ServerGames.Add(game);
+                    }
+                }
+            }
+            return game;
         }
 
         [HttpPost]
@@ -49,18 +85,9 @@ namespace SidusAPI.Controllers
         {
             try
             {
-                GameMatch? serverGame = ServerGames.FirstOrDefault(x => x.GameGuid == currentTurn.GameGuid);
-                int playerIndex = -1;
-                Player? playerTurn = null;
-                for (int i = 0; i < currentTurn.Players?.Count(); i++)
-                {
-                    if (currentTurn.Players[i] != null)
-                    {
-                        playerIndex = i;
-                        playerTurn = currentTurn.Players[i];
-                    }
-                }
-                if (serverGame == null || playerTurn == null || playerIndex == -1)
+                GameMatch? serverGame = GetServerMatch(currentTurn.GameGuid);
+                GamePlayer? playerTurn = currentTurn.Players?.FirstOrDefault();
+                if (serverGame == null || playerTurn == null)
                 {
                     return false;
                 }
@@ -70,62 +97,68 @@ namespace SidusAPI.Controllers
                     currentTurn.TurnIsOver = false;
                     serverGame.GameTurns.Add(currentTurn);
                     gameTurn = currentTurn;
+                    UpdateDBCreateTurn(gameTurn);
                 }
                 else if (!gameTurn.TurnIsOver)
                 {
-                    gameTurn.Players[playerIndex] = playerTurn;
+                    GamePlayer? submittedTurn = gameTurn.Players?.FirstOrDefault(x => x.PlayerId == playerTurn.PlayerId);
+                    if (submittedTurn == null)
+                    {
+                        gameTurn.Players.Add(playerTurn);
+                    }
+                    else
+                    {
+                        gameTurn.Players[submittedTurn.PlayerId] = playerTurn;
+                    }
+                    UpdateDBAddPlayer(playerTurn);
                 }
                 //Do market stuff if everyone is done with their turns
-                if (AllSubmittedTurn(gameTurn) && !gameTurn.TurnIsOver)
+                if (gameTurn.Players?.Count() == serverGame.MaxPlayers && !gameTurn.TurnIsOver)
                 {
+                    var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModuleGuid);
                     //Decrease turn timer and reset old modules
-                    foreach (var module in gameTurn.MarketModules)
+                    foreach (var moduleGuid in gameTurn.MarketModuleGuids.Split(",").Select(x => Guid.Parse(x)))
                     {
-                        if (module.TurnsLeft > 1)
+                        if (!bidGroup.Any(x => x.Key == moduleGuid))
                         {
-                            module.TurnsLeft--;
-                            module.MidBid = (module.TurnsLeft * 2)+1;
+                            var module = gameTurn.AllModules.FirstOrDefault(x => x.ModuleGuid == moduleGuid);
+                            if (module.TurnsLeft > 1)
+                            {
+                                module.TurnsLeft--;
+                                module.MidBid = (module.TurnsLeft * 2) + 1;
+                            }
+                            else
+                            {
+                                var newModule = GetNewServerModule(gameTurn, serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers), gameTurn.GameGuid, gameTurn.TurnNumber);
+                                gameTurn.MarketModuleGuids = gameTurn.MarketModuleGuids.Replace(moduleGuid.ToString(), newModule.ModuleGuid.ToString());
+                                gameTurn.AllModules.Add(newModule);
+                                gameTurn.AllModules.Remove(module);
+                            }
                         }
-                        else
-                        {
-                            var newModule = GetNewServerModule(gameTurn.ModulesForMarket, serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers));
-                            module.ModuleGuid = newModule.ModuleGuid;
-                            module.ModuleId = newModule.ModuleId;
-                            module.MidBid = newModule.MidBid;
-                            module.TurnsLeft = newModule.TurnsLeft;
-                        }
-                        module.PlayerBid = module.MidBid;
                     }
                     //Check on bid wars
-                    var bidGroup = gameTurn.Players?.SelectMany(x => x?.Actions)?.Where(y => y.ActionTypeId == (int)ActionType.BidOnModule).GroupBy(x => x.SelectedModule.ModuleGuid);
                     foreach (var bid in bidGroup)
                     {
+                        var module = gameTurn.AllModules.FirstOrDefault(x => x.ModuleGuid == bid.Key);
                         if (bid.Count() > 1)
                         {
-                            var bidsInOrder = bid.OrderByDescending(x => x.SelectedModule.PlayerBid).ThenBy(x => x.ActionOrder).ToList();
-                            bidsInOrder[0].SelectedModule.PlayerBid = bidsInOrder[1].SelectedModule.PlayerBid;
+                            var bidsInOrder = bid.OrderByDescending(x => x.PlayerBid).ThenBy(x => x.ActionOrder).ToList();
+                            bidsInOrder[0].PlayerBid = bidsInOrder[1].PlayerBid;
                             for (var i = 1; i < bidsInOrder.Count(); i++)
                             {
-                                bidsInOrder[i].SelectedModule = null;
+                                bidsInOrder[i].SelectedModuleGuid = null;
                             }
                         }
                         else
                         {
-                            bid.FirstOrDefault().SelectedModule.PlayerBid = bid.FirstOrDefault().SelectedModule.MidBid;
+                            bid.FirstOrDefault().PlayerBid = module.MidBid;
                         }
-                        //reset bought module
-                        var module = gameTurn.MarketModules?.FirstOrDefault(x => x.ModuleGuid == bid.Key);
-                        //could have already been rotated out
-                        if (module != null)
-                        {
-                            var newModule = GetNewServerModule(gameTurn.ModulesForMarket, serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers));
-                            module.ModuleGuid = newModule.ModuleGuid;
-                            module.ModuleId = newModule.ModuleId;
-                            module.MidBid = newModule.MidBid;
-                            module.TurnsLeft = newModule.TurnsLeft;
-                        }
+                        var newModule = GetNewServerModule(gameTurn, serverGame.NumberOfModules, (serverGame.MaxPlayers == 1 ? 4 : serverGame.MaxPlayers), gameTurn.GameGuid, gameTurn.TurnNumber);
+                        gameTurn.MarketModuleGuids = gameTurn.MarketModuleGuids.Replace(module.ModuleGuid.ToString(), newModule.ModuleGuid.ToString());
+                        gameTurn.AllModules.Add(newModule);
                     }
                     gameTurn.TurnIsOver = true;
+                    UpdateDBCreateTurn(gameTurn);
                 }
             }
             catch (Exception ex)
@@ -136,8 +169,9 @@ namespace SidusAPI.Controllers
             return true;
         }
 
-        private ServerModule GetNewServerModule(List<int> numMods, int maxNum, int maxTurns)
+        private ServerModule GetNewServerModule(GameTurn GameTurn, int maxNum, int maxTurns, Guid gameGuid, int turnNumber)
         {
+            List<int> numMods = GetIntListFromString(GameTurn.ModulesForMarket);
             if (numMods.Count <= 0)
             {
                 for (int i = 0; i <= maxNum; i++)
@@ -149,8 +183,11 @@ namespace SidusAPI.Controllers
             int createIndex = rnd.Next(0, numMods.Count);
             var moduleToCreate = numMods[createIndex];
             numMods.RemoveAt(createIndex);
+            GameTurn.ModulesForMarket = String.Join(",", numMods);
             return new ServerModule()
             {
+                GameGuid = gameGuid,
+                TurnNumber = turnNumber,
                 ModuleGuid = Guid.NewGuid(),
                 ModuleId = moduleToCreate,
                 TurnsLeft = maxTurns,
@@ -158,107 +195,208 @@ namespace SidusAPI.Controllers
             };
         }
 
-        private bool AllSubmittedTurn(GameTurn? gameTurn)
-        {
-            return gameTurn?.Players?.All(x => x != null) ?? false;
-        }
-
         [HttpGet]
         [Route("FindGames")]
         public List<GameMatch> FindGames(Guid? playerGuid = null)
         {
-            for (int i = ServerGames.Count - 1; i >= 0; i--)
+            using (var context = new ApplicationDbContext())
             {
-                if ((ServerGames[i].GameTurns[0]?.Players?.Any(y => y == null) ?? false) && ServerGames[i].HealthCheck < DateTime.Now.AddHours(-24))
+                var serverGames = context.GameMatches.Include(gm => gm.GameTurns)
+                    .ThenInclude(gt => gt.Players).Where(x => !x.IsDeleted && x.GameTurns.Count > 0).ToList();
+                var gamesToRemove = serverGames.Where(x => x.GameTurns[0].Players.Count() < x.MaxPlayers && x.HealthCheck < DateTime.Now.AddHours(-24)).ToList();
+                foreach(var game in gamesToRemove)
                 {
-                    ServerGames.RemoveAt(i);
+                    game.IsDeleted = true;
                 }
+                UpdateDBSave(context);
+                if (playerGuid != null)
+                    return serverGames.Where(x => !x.IsDeleted && x.Winner == -1 && x.GameTurns[0].Players.Any(x => x.PlayerGuid == playerGuid)).ToList();
+                return serverGames.Where(x => !x.IsDeleted && x.GameTurns[0].Players.Count() < x.MaxPlayers).ToList();
             }
-            if (playerGuid != null)
-                return ServerGames.Where(x => x.Winner == -1 && x.GameTurns[0]?.Players?.Count() > 1 && (x.GameTurns[0]?.Players?.Any(x => x.Station.UnitGuid == playerGuid) ?? false)).ToList();
-            return ServerGames.Where(x => (x.GameTurns[0]?.Players?.Any(y => y == null) ?? false)).ToList();
-        } 
-        
+        }
+
         [HttpPost]
         [Route("JoinGame")]
         public GameMatch? JoinGame(GameMatch ClientGame)
         {
-            GameMatch? matchToJoin = ServerGames.FirstOrDefault(x => x.GameGuid == ClientGame.GameGuid);
-            if (matchToJoin != null && matchToJoin.GameTurns[0].Players != null)
+            GameMatch? matchToJoin = GetServerMatch(ClientGame.GameGuid);
+            if (matchToJoin != null && matchToJoin.GameTurns?[0]?.Players != null)
             {
-                if (matchToJoin.GameTurns[0]?.Players?.Any(y => y == null) ?? false)
+                var currentPlayerCount = matchToJoin.GameTurns[0].Players.Count();
+                if (currentPlayerCount < matchToJoin.MaxPlayers && ClientGame.GameTurns[0].Players.Count() > currentPlayerCount)
                 {
-                    for (var i = (matchToJoin.GameTurns[0]?.Players?.Count() - 1 ?? 0); i >= 0; i--)
-                    {
-                        if (matchToJoin.GameTurns[0]?.Players[i] == null)
-                        {
-                            matchToJoin.GameTurns[0].Players[i] = ClientGame.GameTurns[0].Players[1];
-                            return matchToJoin;
-                        }
-                    }
+                    var newPlayer = ClientGame.GameTurns[0].Players.Last();
+                    matchToJoin.GameTurns[0].Players.Add(newPlayer);
+                    UpdateDBAddPlayer(newPlayer);
+                    return matchToJoin;
                 }
-                else if (ClientGame.GameTurns[0]?.Players?.Count() > 1 && (matchToJoin.GameTurns[0]?.Players?.Where(x => x != null).Any(x => x.Station.UnitGuid == ClientGame.GameTurns[0].Players[1].Station.UnitGuid) ?? false))
+                else
                 {
                     return matchToJoin;
                 }
             }
             return null;
         }
-        
+
         [HttpPost]
         [Route("CreateGame")]
         public GameMatch CreateGame([FromBody] GameMatch ClientGame)
         {
-            ClientGame.GameGuid = Guid.NewGuid();
+            ClientGame.GameGuid = ClientGame.GameGuid;
             Random rnd = new Random();
+            List<Guid> newModules = new List<Guid>();
             for (int i = 0; i < (ClientGame.MaxPlayers == 1 ? 4 : ClientGame.MaxPlayers); i++)
             {
-                ClientGame.GameTurns[0].MarketModules.Add(GetNewServerModule(ClientGame.GameTurns[0].ModulesForMarket, ClientGame.NumberOfModules, (ClientGame.MaxPlayers == 1 ? 4 : ClientGame.MaxPlayers)));
+                var newModule = GetNewServerModule(ClientGame.GameTurns[0], ClientGame.NumberOfModules, (ClientGame.MaxPlayers == 1 ? 4 : ClientGame.MaxPlayers), ClientGame.GameGuid, 0);
+                ClientGame.GameTurns[0].AllModules.Add(newModule);
+                newModules.Add(newModule.ModuleGuid);
             }
+            ClientGame.GameTurns[0].MarketModuleGuids = String.Join(",", newModules);
             ClientGame.Winner = -1;
             ClientGame.HealthCheck = DateTime.Now;
+            UpdateDBCreateGame(ClientGame);
             ServerGames.Add(ClientGame);
             return ClientGame;
         }
-
+        public List<int> GetIntListFromString(string? csvString)
+        {
+            if(String.IsNullOrEmpty(csvString))
+                return new List<int>();
+            return csvString.Split(",").Select(x => int.Parse(x)).ToList();
+        }
         [HttpGet]
         [Route("EndGame")]
         public int EndGame(Guid gameGuid, int winner)
         {
-            if(winner != -1)
-                ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid).Winner = winner;
-            return ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid).Winner;
+            using (var context = new ApplicationDbContext())
+            {
+                var serverGame = GetServerMatch(gameGuid);
+                if (winner != -1)
+                    serverGame.Winner = winner;
+                context.SaveChanges();
+                return serverGame.Winner;
+            }
         }
 
         [HttpGet]
         [Route("HasTakenTurn")]
         public GameTurn? HasTakenTurn(Guid gameGuid, int turnNumber)
         {
-            var game = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid);
-            if (game != null)
+            var serverGame = GetServerMatch(gameGuid);
+            if (serverGame != null)
             {
                 Stopwatch timer = new Stopwatch();
                 timer.Start();
-                var gameTurn = game?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                var startPlayers = gameTurn?.Players?.Count(x => x != null) ?? 0;
+                var gameTurn = serverGame?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
+                var startPlayers = gameTurn?.Players?.Count();
                 while (timer.Elapsed.TotalSeconds < 10)
                 {
-                    game.HealthCheck = DateTime.Now;
-                    gameTurn = game?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                    var currentPlayers = gameTurn?.Players?.Count(x => x != null) ?? 0;
-                    if (startPlayers != currentPlayers || (gameTurn?.Players?.All(x => x != null) ?? false))
+                    serverGame.HealthCheck = DateTime.Now;
+                    UpdateDBHealthCheck(gameGuid, serverGame.HealthCheck);
+                    gameTurn = GetServerMatch(gameGuid).GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
+                    var currentPlayers = gameTurn?.Players?.Count();
+                    if (startPlayers != currentPlayers || (currentPlayers == serverGame.MaxPlayers))
                     {
                         return gameTurn;
                     }
                     else
                     {
-                        Thread.Sleep(250);
+                        Thread.Sleep(500);
                     }
                 }
                 timer.Stop();
                 return gameTurn;
             }
             return null;
+        }
+
+        private async Task UpdateDBHealthCheck(Guid gameGuid, DateTime healthCheck)
+        {
+            using (var context = new ApplicationDbContext())
+            {
+                try
+                {
+                    context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid).HealthCheck = healthCheck;
+                    await context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print(ex.ToString());
+                }
+            }
+        }
+        private async Task UpdateDBCreateGame(GameMatch newGame)
+        {
+            using (var context = new ApplicationDbContext())
+            {
+                try
+                {
+                    context.GameMatches.Add(newGame);
+                    await context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print(ex.ToString());
+                }
+            }
+        }
+
+        private async Task UpdateDBCreateTurn(GameTurn gameTurn)
+        {
+            using (var context = new ApplicationDbContext())
+            {
+                try {
+                    var turn = context.GameTurns.FirstOrDefault(x => x.GameGuid == gameTurn.GameGuid && x.TurnNumber == gameTurn.TurnNumber);
+                    if (turn == null)
+                    {
+                        context.GameTurns.Add(gameTurn);
+                    }
+                    else
+                    {
+                        turn = gameTurn;
+                    }
+                    await context.SaveChangesAsync();
+                }
+                catch(Exception ex)
+                {
+                    Debug.Print(ex.ToString());
+                }
+            }
+        }
+
+        private async Task UpdateDBSave(ApplicationDbContext context)
+        {
+            try{
+                await context.SaveChangesAsync();
+            }
+            catch(Exception ex)
+            {
+                Debug.Print(ex.ToString());
+            }
+        }
+
+        private async Task UpdateDBAddPlayer(GamePlayer newPlayer)
+        {
+            using (var context = new ApplicationDbContext())
+            {
+                try
+                {
+                    var gamePlayer = context.GamePlayers.FirstOrDefault(x => x.GameGuid == newPlayer.GameGuid && x.TurnNumber == newPlayer.TurnNumber && x.PlayerId == newPlayer.PlayerId);
+                    if (gamePlayer == null)
+                    {
+                        context.GamePlayers.Add(newPlayer);
+                    }
+                    else
+                    {
+                        gamePlayer = newPlayer;
+                    }
+                    await context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print(ex.ToString());
+                }
+            }
         }
     }
 }
