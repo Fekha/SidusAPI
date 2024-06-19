@@ -272,8 +272,11 @@ namespace SidusAPI.Controllers
             {
                 var serverGame = GetServerMatch(gameGuid);
                 if (winner != -1)
+                {
                     serverGame.Winner = winner;
-                context.SaveChanges();
+                    context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid).Winner = winner;
+                    context.SaveChanges();
+                }
                 return serverGame.Winner;
             }
         }
