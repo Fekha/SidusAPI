@@ -22,6 +22,26 @@ namespace SidusAPI.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder, 1L, 1);
 
+            modelBuilder.Entity("SidusAPI.ServerModels.Account", b =>
+                {
+                    b.Property<Guid>("PlayerGuid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AccountId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Username")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("PlayerGuid");
+
+                    b.ToTable("Accounts");
+                });
+
             modelBuilder.Entity("SidusAPI.ServerModels.GameMatch", b =>
                 {
                     b.Property<Guid>("GameGuid")
