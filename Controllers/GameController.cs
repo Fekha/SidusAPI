@@ -101,14 +101,14 @@ namespace SidusAPI.Controllers
                 }
                 else if (!gameTurn.TurnIsOver)
                 {
-                    GamePlayer? submittedTurn = gameTurn.Players?.FirstOrDefault(x => x.PlayerId == playerTurn.PlayerId);
+                    GamePlayer? submittedTurn = gameTurn.Players?.FirstOrDefault(x => x.PlayerGuid == playerTurn.PlayerGuid);
                     if (submittedTurn == null)
                     {
                         gameTurn.Players.Add(playerTurn);
                     }
                     else
                     {
-                        gameTurn.Players[submittedTurn.PlayerId] = playerTurn;
+                        submittedTurn = playerTurn;
                     }
                     UpdateDBAddPlayer(playerTurn);
                 }
@@ -210,7 +210,7 @@ namespace SidusAPI.Controllers
                 }
                 UpdateDBSave(context);
                 if (playerGuid != null)
-                    return serverGames.Where(x => !x.IsDeleted && x.Winner == -1 && x.GameTurns[0].Players.Any(x => x.PlayerGuid == playerGuid)).ToList();
+                    return serverGames.Where(x => !x.IsDeleted && x.Winner == Guid.Empty && x.GameTurns[0].Players.Any(x => x.PlayerGuid == playerGuid)).ToList();
                 return serverGames.Where(x => !x.IsDeleted && x.GameTurns[0].Players.Count() < x.MaxPlayers).ToList();
             }
         }
@@ -225,7 +225,8 @@ namespace SidusAPI.Controllers
                 var currentPlayerCount = matchToJoin.GameTurns[0].Players.Count();
                 if (currentPlayerCount < matchToJoin.MaxPlayers && ClientGame.GameTurns[0].Players.Count() > currentPlayerCount)
                 {
-                    var newPlayer = ClientGame.GameTurns[0].Players.Last();
+                    var newPlayer = ClientGame.GameTurns[0].Players.OrderBy(x=>x.PlayerColor).Last();
+                    newPlayer.PlayerColor = ClientGame.GameTurns[0].Players.Count()-1;
                     matchToJoin.GameTurns[0].Players.Add(newPlayer);
                     UpdateDBAddPlayer(newPlayer);
                     return matchToJoin;
@@ -252,7 +253,7 @@ namespace SidusAPI.Controllers
                 newModules.Add(newModule.ModuleGuid);
             }
             ClientGame.GameTurns[0].MarketModuleGuids = String.Join(",", newModules);
-            ClientGame.Winner = -1;
+            ClientGame.Winner = Guid.Empty;
             ClientGame.HealthCheck = DateTime.Now;
             UpdateDBCreateGame(ClientGame);
             ServerGames.Add(ClientGame);
@@ -266,12 +267,12 @@ namespace SidusAPI.Controllers
         }
         [HttpGet]
         [Route("EndGame")]
-        public int EndGame(Guid gameGuid, int winner)
+        public Guid EndGame(Guid gameGuid, Guid winner)
         {
             using (var context = new ApplicationDbContext())
             {
                 var serverGame = GetServerMatch(gameGuid);
-                if (winner != -1)
+                if (winner != Guid.Empty)
                 {
                     serverGame.Winner = winner;
                     context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid).Winner = winner;
@@ -384,7 +385,7 @@ namespace SidusAPI.Controllers
             {
                 try
                 {
-                    var gamePlayer = context.GamePlayers.FirstOrDefault(x => x.GameGuid == newPlayer.GameGuid && x.TurnNumber == newPlayer.TurnNumber && x.PlayerId == newPlayer.PlayerId);
+                    var gamePlayer = context.GamePlayers.FirstOrDefault(x => x.GameGuid == newPlayer.GameGuid && x.TurnNumber == newPlayer.TurnNumber && x.PlayerGuid == newPlayer.PlayerGuid);
                     if (gamePlayer == null)
                     {
                         context.GamePlayers.Add(newPlayer);

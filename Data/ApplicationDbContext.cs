@@ -32,10 +32,10 @@ namespace SidusAPI.Data
             modelBuilder.Entity<GameMatch>().HasKey(gt => new { gt.GameGuid });
             modelBuilder.Entity<GameTurn>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber });
             modelBuilder.Entity<ServerNode>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.X, gt.Y });
-            modelBuilder.Entity<GamePlayer>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerId });
-            modelBuilder.Entity<ServerTechnology>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerId, gt.TechnologyId });
-            modelBuilder.Entity<ServerAction>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerId, gt.ActionOrder });
-            modelBuilder.Entity<ServerUnit>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerId, gt.UnitGuid });
+            modelBuilder.Entity<GamePlayer>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerGuid });
+            modelBuilder.Entity<ServerTechnology>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerGuid, gt.TechnologyId });
+            modelBuilder.Entity<ServerAction>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerGuid, gt.ActionOrder });
+            modelBuilder.Entity<ServerUnit>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerGuid, gt.UnitGuid });
             modelBuilder.Entity<ServerModule>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.ModuleGuid });
         }
     }
