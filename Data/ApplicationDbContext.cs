@@ -28,15 +28,52 @@ namespace SidusAPI.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-            modelBuilder.Entity<Account>().HasKey(gt => new { gt.PlayerGuid });
-            modelBuilder.Entity<GameMatch>().HasKey(gt => new { gt.GameGuid });
-            modelBuilder.Entity<GameTurn>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber });
-            modelBuilder.Entity<ServerNode>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.X, gt.Y });
-            modelBuilder.Entity<GamePlayer>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerGuid });
-            modelBuilder.Entity<ServerTechnology>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerGuid, gt.TechnologyId });
-            modelBuilder.Entity<ServerAction>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerGuid, gt.ActionOrder });
-            modelBuilder.Entity<ServerUnit>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerGuid, gt.UnitGuid });
-            modelBuilder.Entity<ServerModule>().HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.ModuleGuid });
+
+            modelBuilder.Entity<Account>()
+                .HasKey(gt => new { gt.PlayerGuid });
+            modelBuilder.Entity<Account>()
+                .HasIndex(gm => gm.PlayerGuid);
+
+            modelBuilder.Entity<GameMatch>()
+                .HasKey(gt => new { gt.GameGuid });
+            modelBuilder.Entity<GameMatch>()
+                .HasIndex(gm => gm.GameGuid);
+
+            modelBuilder.Entity<GameTurn>()
+                .HasKey(gt => new { gt.GameGuid, gt.TurnNumber });
+            modelBuilder.Entity<GameTurn>()
+                .HasIndex(gt => new { gt.GameGuid, gt.TurnNumber }); 
+
+            modelBuilder.Entity<ServerNode>()
+                .HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.X, gt.Y });
+            modelBuilder.Entity<ServerNode>()
+                .HasIndex(sn => new { sn.GameGuid, sn.TurnNumber });
+
+            modelBuilder.Entity<GamePlayer>()
+                .HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerGuid });
+            modelBuilder.Entity<GamePlayer>()
+                .HasIndex(gp => new { gp.GameGuid, gp.TurnNumber, gp.PlayerGuid });
+
+            modelBuilder.Entity<ServerTechnology>()
+                .HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerGuid, gt.TechnologyId });
+            modelBuilder.Entity<ServerTechnology>()
+                .HasIndex(st => new { st.GameGuid, st.TurnNumber, st.PlayerGuid });
+
+            modelBuilder.Entity<ServerAction>()
+                .HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerGuid, gt.ActionOrder });
+            modelBuilder.Entity<ServerAction>()
+                .HasIndex(sa => new { sa.GameGuid, sa.TurnNumber, sa.PlayerGuid }); 
+
+            modelBuilder.Entity<ServerUnit>()
+                .HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.PlayerGuid, gt.UnitGuid });
+            modelBuilder.Entity<ServerUnit>()
+                .HasIndex(su => new { su.GameGuid, su.TurnNumber, su.PlayerGuid }); 
+
+            modelBuilder.Entity<ServerModule>()
+                .HasKey(gt => new { gt.GameGuid, gt.TurnNumber, gt.ModuleGuid });
+            modelBuilder.Entity<ServerModule>()
+                .HasIndex(sm => new { sm.GameGuid, sm.TurnNumber });
         }
+
     }
 }
