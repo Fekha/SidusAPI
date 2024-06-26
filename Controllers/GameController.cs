@@ -49,43 +49,6 @@ namespace SidusAPI.Controllers
             }
         }
 
-        private GameMatch GetServerMatch(Guid gameGuid)
-        {
-            var game = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid);
-            try
-            {
-                if (game == null)
-                {
-                    using (var context = new ApplicationDbContext())
-                    {
-                        game = context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid);
-                        game.GameTurns = context.GameTurns.Where(x => x.GameGuid == gameGuid).OrderBy(x=>x.TurnNumber).ToList();
-                        foreach(var gameTurn in game.GameTurns)
-                        {
-                            gameTurn.Players = context.GamePlayers.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
-                            gameTurn.AllModules = context.ServerModules.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
-                            gameTurn.AllNodes = context.ServerNodes.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
-                            foreach(var player in gameTurn.Players)
-                            {
-                                player.Actions = context.ServerActions.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber && x.PlayerGuid == player.PlayerGuid).ToList();
-                                player.Technology = context.ServerTechnologies.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber && x.PlayerGuid == player.PlayerGuid).ToList();
-                                player.Units = context.ServerUnits.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber && x.PlayerGuid == player.PlayerGuid).ToList();
-                            }
-                        }
-                        if (game != null)
-                        {
-                            ServerGames.Add(game);
-                        }
-                    }
-                }
-            }
-            catch(Exception ex)
-            {
-                Debug.Print(ex.ToString());
-            }
-            return game;
-        }
-
         [HttpPost]
         [Route("EndTurn")]
         public bool EndTurn([FromBody] GameTurn currentTurn)
@@ -109,14 +72,14 @@ namespace SidusAPI.Controllers
                 }
                 else if (!gameTurn.TurnIsOver)
                 {
-                    GamePlayer? submittedTurn = gameTurn.Players?.FirstOrDefault(x => x.PlayerGuid == playerTurn.PlayerGuid);
-                    if (submittedTurn == null)
+                    int turnIndex = gameTurn.Players.Select(x=>x.PlayerGuid).ToList().IndexOf(playerTurn.PlayerGuid);
+                    if (turnIndex == -1)
                     {
                         gameTurn.Players.Add(playerTurn);
                     }
                     else
                     {
-                        submittedTurn = playerTurn;
+                        gameTurn.Players[turnIndex] = playerTurn;
                     }
                     if (serverGame.MaxPlayers > 1) //Dont save practice games
                         UpdateDBAddPlayer(playerTurn);
@@ -179,39 +142,12 @@ namespace SidusAPI.Controllers
             return true;
         }
 
-        private ServerModule GetNewServerModule(GameTurn GameTurn, int maxNum, int maxTurns, Guid gameGuid, int turnNumber)
-        {
-            List<int> numMods = GetIntListFromString(GameTurn.ModulesForMarket);
-            if (numMods.Count <= 0)
-            {
-                for (int i = 0; i <= maxNum; i++)
-                {
-                    numMods.Add(i);
-                }
-            }
-            Random rnd = new Random();
-            int createIndex = rnd.Next(0, numMods.Count);
-            var moduleToCreate = numMods[createIndex];
-            numMods.RemoveAt(createIndex);
-            GameTurn.ModulesForMarket = String.Join(",", numMods);
-            return new ServerModule()
-            {
-                GameGuid = gameGuid,
-                TurnNumber = turnNumber,
-                ModuleGuid = Guid.NewGuid(),
-                ModuleId = moduleToCreate,
-                TurnsLeft = maxTurns,
-                MidBid = (2*maxTurns) + 4,
-            };
-        }
-
         [HttpGet]
         [Route("FindGames")]
         public List<GameMatch> FindGames(Guid? playerGuid = null)
         {
             using (var context = new ApplicationDbContext())
             {
-                
                 try
                 {
                     var serverGames = context.GameMatches.Include(gm => gm.GameTurns)
@@ -240,107 +176,199 @@ namespace SidusAPI.Controllers
         [Route("JoinGame")]
         public GameMatch? JoinGame(GameMatch ClientGame)
         {
-            GameMatch? matchToJoin = GetServerMatch(ClientGame.GameGuid);
-            if (matchToJoin != null && matchToJoin.GameTurns?.FirstOrDefault()?.Players != null)
+            try
             {
-                var currentPlayerCount = matchToJoin.GameTurns.FirstOrDefault().Players.Count();
-                if (currentPlayerCount < matchToJoin.MaxPlayers && ClientGame.GameTurns.FirstOrDefault().Players.Count() > currentPlayerCount)
+                GameMatch? matchToJoin = GetServerMatch(ClientGame.GameGuid);
+                if (matchToJoin != null && matchToJoin.GameTurns?.FirstOrDefault()?.Players != null)
                 {
-                    var newPlayer = ClientGame.GameTurns.FirstOrDefault().Players.OrderBy(x=>x.PlayerColor).Last();
-                    newPlayer.PlayerColor = ClientGame.GameTurns.FirstOrDefault().Players.Count()-1;
-                    matchToJoin.GameTurns.FirstOrDefault().Players.Add(newPlayer);
-                    UpdateDBAddPlayer(newPlayer);
-                    return matchToJoin;
+                    var currentPlayerCount = matchToJoin.GameTurns.FirstOrDefault().Players.Count();
+                    if (currentPlayerCount < matchToJoin.MaxPlayers && ClientGame.GameTurns.FirstOrDefault().Players.Count() > currentPlayerCount)
+                    {
+                        var newPlayer = ClientGame.GameTurns.FirstOrDefault().Players.OrderBy(x => x.PlayerColor).Last();
+                        newPlayer.PlayerColor = ClientGame.GameTurns.FirstOrDefault().Players.Count() - 1;
+                        matchToJoin.GameTurns.FirstOrDefault().Players.Add(newPlayer);
+                        UpdateDBAddPlayer(newPlayer);
+                        return matchToJoin;
+                    }
+                    else
+                    {
+                        return matchToJoin;
+                    }
                 }
-                else
-                {
-                    return matchToJoin;
-                }
+            }
+            catch (Exception ex)
+            {
+                Debug.Print(ex.ToString());
             }
             return null;
         }
 
         [HttpPost]
         [Route("CreateGame")]
-        public GameMatch CreateGame([FromBody] GameMatch ClientGame)
+        public GameMatch? CreateGame([FromBody] GameMatch ClientGame)
         {
-            ClientGame.GameGuid = ClientGame.GameGuid;
-            Random rnd = new Random();
-            List<Guid> newModules = new List<Guid>();
-            for (int i = 0; i < 3; i++)
+            try
             {
-                var newModule = GetNewServerModule(ClientGame.GameTurns.FirstOrDefault(), ClientGame.NumberOfModules, i+1, ClientGame.GameGuid, 0);
-                ClientGame.GameTurns.FirstOrDefault().AllModules.Add(newModule);
-                newModules.Add(newModule.ModuleGuid);
+                ClientGame.GameGuid = ClientGame.GameGuid;
+                Random rnd = new Random();
+                List<Guid> newModules = new List<Guid>();
+                for (int i = 0; i < 3; i++)
+                {
+                    var newModule = GetNewServerModule(ClientGame.GameTurns.FirstOrDefault(), ClientGame.NumberOfModules, i + 1, ClientGame.GameGuid, 0);
+                    ClientGame.GameTurns.FirstOrDefault().AllModules.Add(newModule);
+                    newModules.Add(newModule.ModuleGuid);
+                }
+                ClientGame.GameTurns.FirstOrDefault().MarketModuleGuids = String.Join(",", newModules);
+                ClientGame.Winner = Guid.Empty;
+                ClientGame.HealthCheck = DateTime.Now;
+                if (ClientGame.MaxPlayers > 1) //Dont save practice games
+                    UpdateDBCreateGame(ClientGame);
+                ServerGames.Add(ClientGame);
+                return ClientGame;
             }
-            ClientGame.GameTurns.FirstOrDefault().MarketModuleGuids = String.Join(",", newModules);
-            ClientGame.Winner = Guid.Empty;
-            ClientGame.HealthCheck = DateTime.Now;
-            if (ClientGame.MaxPlayers > 1) //Dont save practice games
-                UpdateDBCreateGame(ClientGame);
-            ServerGames.Add(ClientGame);
-            return ClientGame;
+            catch (Exception ex)
+            {
+                Debug.Print(ex.ToString());
+            }
+            return null;
         }
-        public List<int> GetIntListFromString(string? csvString)
-        {
-            if(String.IsNullOrEmpty(csvString))
-                return new List<int>();
-            return csvString.Split(",").Select(x => int.Parse(x)).ToList();
-        }
+
         [HttpGet]
         [Route("EndGame")]
         public Guid EndGame(Guid gameGuid, Guid winner)
         {
-            using (var context = new ApplicationDbContext())
+            try
             {
-                var serverGame = GetServerMatch(gameGuid);
-                if (winner != Guid.Empty)
+                using (var context = new ApplicationDbContext())
                 {
-                    serverGame.Winner = winner;
-                    var game = context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid);
-                    if (game != null)
+                    var serverGame = GetServerMatch(gameGuid);
+                    if (winner != Guid.Empty)
                     {
-                        game.Winner = winner;
-                        context.SaveChanges();
+                        serverGame.Winner = winner;
+                        var game = context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid);
+                        if (game != null)
+                        {
+                            game.Winner = winner;
+                            context.SaveChanges();
+                        }
                     }
+                    return serverGame.Winner;
                 }
-                return serverGame.Winner;
             }
+            catch (Exception ex)
+            {
+                Debug.Print(ex.ToString());
+            }
+            return Guid.NewGuid();
         }
 
         [HttpGet]
         [Route("HasTakenTurn")]
         public GameTurn? HasTakenTurn(Guid gameGuid, int turnNumber)
         {
-            var serverGame = GetServerMatch(gameGuid);
-            if (serverGame != null)
+            try
             {
-                Stopwatch timer = new Stopwatch();
-                timer.Start();
-                var gameTurn = serverGame?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                var startPlayers = gameTurn?.Players?.Count();
-                while (timer.Elapsed.TotalSeconds < 10)
+                var serverGame = GetServerMatch(gameGuid);
+                if (serverGame != null)
                 {
-                    serverGame.HealthCheck = DateTime.Now;
-                    if (serverGame.MaxPlayers > 1) //Dont save practice games
-                        UpdateDBHealthCheck(gameGuid, serverGame.HealthCheck);
-                    gameTurn = GetServerMatch(gameGuid).GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                    var currentPlayers = gameTurn?.Players?.Count();
-                    if (startPlayers != currentPlayers || (currentPlayers == serverGame.MaxPlayers))
+                    Stopwatch timer = new Stopwatch();
+                    timer.Start();
+                    var gameTurn = serverGame?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
+                    var startPlayers = gameTurn?.Players?.Count();
+                    while (timer.Elapsed.TotalSeconds < 10)
                     {
-                        return gameTurn;
+                        serverGame.HealthCheck = DateTime.Now;
+                        if (serverGame.MaxPlayers > 1) //Dont save practice games
+                            UpdateDBHealthCheck(gameGuid, serverGame.HealthCheck);
+                        gameTurn = GetServerMatch(gameGuid).GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
+                        var currentPlayers = gameTurn?.Players?.Count();
+                        if (startPlayers != currentPlayers || (currentPlayers == serverGame.MaxPlayers))
+                        {
+                            return gameTurn;
+                        }
+                        else
+                        {
+                            Thread.Sleep(500);
+                        }
                     }
-                    else
-                    {
-                        Thread.Sleep(500);
-                    }
+                    timer.Stop();
+                    return gameTurn;
                 }
-                timer.Stop();
-                return gameTurn;
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Debug.Print(ex.ToString());
             }
             return null;
         }
-
+        private GameMatch GetServerMatch(Guid gameGuid)
+        {
+            var game = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid);
+            try
+            {
+                if (game == null)
+                {
+                    using (var context = new ApplicationDbContext())
+                    {
+                        game = context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid);
+                        game.GameTurns = context.GameTurns.Where(x => x.GameGuid == gameGuid).OrderBy(x => x.TurnNumber).ToList();
+                        foreach (var gameTurn in game.GameTurns)
+                        {
+                            gameTurn.Players = context.GamePlayers.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
+                            gameTurn.AllModules = context.ServerModules.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
+                            gameTurn.AllNodes = context.ServerNodes.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
+                            foreach (var player in gameTurn.Players)
+                            {
+                                player.Actions = context.ServerActions.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber && x.PlayerGuid == player.PlayerGuid).ToList();
+                                player.Technology = context.ServerTechnologies.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber && x.PlayerGuid == player.PlayerGuid).ToList();
+                                player.Units = context.ServerUnits.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber && x.PlayerGuid == player.PlayerGuid).ToList();
+                            }
+                        }
+                        if (game != null)
+                        {
+                            ServerGames.Add(game);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.Print(ex.ToString());
+            }
+            return game;
+        }
+        private ServerModule GetNewServerModule(GameTurn GameTurn, int maxNum, int maxTurns, Guid gameGuid, int turnNumber)
+        {
+            List<int> numMods = GetIntListFromString(GameTurn.ModulesForMarket);
+            if (numMods.Count <= 0)
+            {
+                for (int i = 0; i <= maxNum; i++)
+                {
+                    numMods.Add(i);
+                }
+            }
+            Random rnd = new Random();
+            int createIndex = rnd.Next(0, numMods.Count);
+            var moduleToCreate = numMods[createIndex];
+            numMods.RemoveAt(createIndex);
+            GameTurn.ModulesForMarket = String.Join(",", numMods);
+            return new ServerModule()
+            {
+                GameGuid = gameGuid,
+                TurnNumber = turnNumber,
+                ModuleGuid = Guid.NewGuid(),
+                ModuleId = moduleToCreate,
+                TurnsLeft = maxTurns,
+                MidBid = (2 * maxTurns) + 4,
+            };
+        }
+        public List<int> GetIntListFromString(string? csvString)
+        {
+            if (String.IsNullOrEmpty(csvString))
+                return new List<int>();
+            return csvString.Split(",").Select(x => int.Parse(x)).ToList();
+        }
         private async Task UpdateDBHealthCheck(Guid gameGuid, DateTime healthCheck)
         {
             using (var context = new ApplicationDbContext())
