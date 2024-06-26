@@ -5,6 +5,7 @@ using SidusAPI.ServerModels;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 using System.Text.RegularExpressions;
 
 namespace SidusAPI.Controllers
@@ -58,7 +59,7 @@ namespace SidusAPI.Controllers
                     using (var context = new ApplicationDbContext())
                     {
                         game = context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid);
-                        game.GameTurns = context.GameTurns.Where(x => x.GameGuid == gameGuid).OrderByDescending(x=>x.TurnNumber).Take(2).OrderBy(x=>x.TurnNumber).ToList();
+                        game.GameTurns = context.GameTurns.Where(x => x.GameGuid == gameGuid).OrderBy(x=>x.TurnNumber).ToList();
                         foreach(var gameTurn in game.GameTurns)
                         {
                             gameTurn.Players = context.GamePlayers.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
@@ -296,8 +297,12 @@ namespace SidusAPI.Controllers
                 if (winner != Guid.Empty)
                 {
                     serverGame.Winner = winner;
-                    context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid).Winner = winner;
-                    context.SaveChanges();
+                    var game = context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid);
+                    if (game != null)
+                    {
+                        game.Winner = winner;
+                        context.SaveChanges();
+                    }
                 }
                 return serverGame.Winner;
             }
