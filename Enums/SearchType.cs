@@ -2,8 +2,8 @@
 {
     public enum SearchType
     {
-        gameSearch, 
+        gameSearch,
+        lobbySearch,
         quickSearch,
-        lobbySearch
     }
 }

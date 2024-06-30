@@ -9,11 +9,15 @@ namespace SidusAPI.Controllers
     {
         [HttpPost]
         [Route("[action]")]
-        public Guid CreateAccount([FromBody]Account account)
+        public ActionResult<Guid> CreateAccount([FromBody]Account account, int clientVersion)
         {
-            using (var context = new ApplicationDbContext())
+            try
             {
-                try{
+                var clientVersionText = CheckClientVersion(clientVersion);
+                if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
+                using (var context = new ApplicationDbContext())
+                {
+
                     var oldAccount = context.Accounts.FirstOrDefault(a => a.AccountId == account.AccountId);
                     if (oldAccount == null)
                     {
@@ -27,19 +31,38 @@ namespace SidusAPI.Controllers
                         return oldAccount.PlayerGuid;
                     }
                 }
-                catch(Exception ex){
-                    return Guid.Empty;
-                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"{ex}");
             }
         }
         
         [HttpGet]
         [Route("[action]")]
-        public Account GetAccount(string accountId)
+        public ActionResult<Account> GetAccount(string accountId, int clientVersion)
+        {
+            try
+            {
+                var clientVersionText = CheckClientVersion(clientVersion);
+                if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
+                using (var context = new ApplicationDbContext())
+                {
+                    return context.Accounts.FirstOrDefault(a => a.AccountId == accountId);
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"{ex}");
+            }
+        }
+
+        private string CheckClientVersion(int clientVersion)
         {
             using (var context = new ApplicationDbContext())
             {
-                return context.Accounts.FirstOrDefault(a => a.AccountId == accountId);
+                var serverVersion = context.Settings.FirstOrDefault().ClientVersion;
+                return serverVersion > clientVersion ? $"New Client version {serverVersion} available. Current Client version {clientVersion}" : "";
             }
         }
     }

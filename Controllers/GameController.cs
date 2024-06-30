@@ -24,36 +24,38 @@ namespace SidusAPI.Controllers
             try
             {
                 var clientVersionText = CheckClientVersion(clientVersion);
-                if (String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
+                if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                 var serverGame = GetServerMatch(gameGuid);
                 if (serverGame == null) { return NotFound(); }
                 serverGame.HealthCheck = DateTime.Now;
                 if (serverGame.MaxPlayers > 1) //Dont save practice games
                     UpdateDBHealthCheck(gameGuid, serverGame.HealthCheck);
                 var gameTurn = serverGame.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                if(gameTurn == null) { return NotFound(); }
-                var startPlayers = gameTurn.Players?.Count();
+                if(searchType == (int)SearchType.quickSearch)
+                {
+                    return gameTurn;
+                }
+                var startPlayers = gameTurn?.Players?.Count() ?? 0;
                 var currentPlayers = 0;
                 Stopwatch timer = new Stopwatch();
                 timer.Start();
-                do
+                while (timer.Elapsed.TotalSeconds < 10)
                 {
                     gameTurn = GetServerMatch(gameGuid).GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                    if (gameTurn == null) { return NotFound(); }
-                    currentPlayers = gameTurn.Players?.Count() ?? 0;
-                    if (searchType == (int)SearchType.gameSearch && gameTurn != null && gameTurn.TurnIsOver)
+                    if (gameTurn != null)
                     {
-                        return gameTurn;
+                        currentPlayers = gameTurn?.Players?.Count() ?? 0;
+                        if (searchType == (int)SearchType.gameSearch && (startPlayers != currentPlayers || gameTurn.TurnIsOver))
+                        {
+                            return gameTurn;
+                        }
+                        else if (searchType == (int)SearchType.lobbySearch && (startPlayers != currentPlayers || currentPlayers == serverGame.MaxPlayers))
+                        {
+                            return gameTurn;
+                        }
                     }
-                    else if (searchType == (int)SearchType.lobbySearch && (startPlayers != currentPlayers || (currentPlayers == serverGame.MaxPlayers)))
-                    {
-                        return gameTurn;
-                    }
-                    else if (searchType != (int)SearchType.quickSearch)
-                    {
-                        Thread.Sleep(250);
-                    }
-                } while (timer.Elapsed.TotalSeconds < 10 && searchType != (int)SearchType.quickSearch);
+                    Thread.Sleep(250);
+                } 
                 timer.Stop();
                 return gameTurn;
             }
@@ -70,7 +72,7 @@ namespace SidusAPI.Controllers
             try
             {
                 var clientVersionText = CheckClientVersion(clientVersion);
-                if (String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
+                if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                 GameMatch? serverGame = GetServerMatch(currentTurn.GameGuid);
                 GamePlayer? playerTurn = currentTurn.Players?.FirstOrDefault();
                 if (serverGame == null || playerTurn == null) { return NotFound(); }
@@ -163,7 +165,7 @@ namespace SidusAPI.Controllers
                 using (var context = new ApplicationDbContext())
                 {
                     var clientVersionText = CheckClientVersion(clientVersion);
-                    if (String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
+                    if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                     var serverGames = context.GameMatches.Include(gm => gm.GameTurns)
                     .ThenInclude(gt => gt.Players).Where(x => !x.IsDeleted && x.GameTurns.Count > 0).ToList(); 
                     var gamesToRemove = serverGames.Where(x => x.GameTurns.FirstOrDefault().Players.Count() < x.MaxPlayers && x.HealthCheck < DateTime.Now.AddHours(-24)).ToList();
@@ -192,7 +194,7 @@ namespace SidusAPI.Controllers
             try
             {
                 var clientVersionText = CheckClientVersion(clientVersion);
-                if (String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
+                if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                 GameMatch? matchToJoin = GetServerMatch(ClientGame.GameGuid);
                 if (matchToJoin == null || matchToJoin.GameTurns?.FirstOrDefault()?.Players == null) { return NotFound(); }
                 var currentPlayerCount = matchToJoin.GameTurns.FirstOrDefault().Players.Count();
@@ -221,7 +223,7 @@ namespace SidusAPI.Controllers
             try
             {
                 var clientVersionText = CheckClientVersion(clientVersion);
-                if (String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
+                if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                 ClientGame.GameGuid = ClientGame.GameGuid;
                 Random rnd = new Random();
                 List<Guid> newModules = new List<Guid>();
@@ -252,7 +254,7 @@ namespace SidusAPI.Controllers
             try
             {
                 var clientVersionText = CheckClientVersion(clientVersion);
-                if (String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
+                if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                 using (var context = new ApplicationDbContext())
                 {
                     var serverGame = GetServerMatch(gameGuid);
@@ -386,7 +388,8 @@ namespace SidusAPI.Controllers
                     }
                     else
                     {
-                        turn = gameTurn;
+                        turn.ModulesForMarket = gameTurn.ModulesForMarket;
+                        turn.TurnIsOver = gameTurn.TurnIsOver;
                     }
                     await context.SaveChangesAsync();
                 }
@@ -422,7 +425,8 @@ namespace SidusAPI.Controllers
                     }
                     else
                     {
-                        gamePlayer = newPlayer;
+                        context.ServerActions.RemoveRange(context.ServerActions.Where(x => x.GameGuid == newPlayer.GameGuid && x.TurnNumber == newPlayer.TurnNumber && x.PlayerGuid == newPlayer.PlayerGuid));
+                        context.ServerActions.AddRange(newPlayer.Actions);
                     }
                     await context.SaveChangesAsync();
                 }
