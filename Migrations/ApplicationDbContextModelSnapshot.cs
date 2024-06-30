@@ -415,6 +415,14 @@ namespace SidusAPI.Migrations
                     b.ToTable("ServerUnits");
                 });
 
+            modelBuilder.Entity("SidusAPI.ServerModels.Settings", b =>
+                {
+                    b.Property<int>("ClientVersion")
+                        .HasColumnType("int");
+
+                    b.ToTable("Settings");
+                });
+
             modelBuilder.Entity("SidusAPI.ServerModels.GamePlayer", b =>
                 {
                     b.HasOne("SidusAPI.ServerModels.GameTurn", null)

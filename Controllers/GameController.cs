@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SidusAPI.Data;
+using SidusAPI.Enums;
 using SidusAPI.ServerModels;
 using System;
 using System.Collections.Generic;
@@ -18,49 +19,61 @@ namespace SidusAPI.Controllers
 
         [HttpGet]
         [Route("GetTurns")]
-        public GameTurn? GetTurns(Guid gameGuid, int turnNumber, bool quickSearch)
+        public ActionResult<GameTurn?> GetTurns(Guid gameGuid, int turnNumber, int searchType, int clientVersion)
         {
-            using (var context = new ApplicationDbContext())
+            try
             {
-                try
+                var clientVersionText = CheckClientVersion(clientVersion);
+                if (String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
+                var serverGame = GetServerMatch(gameGuid);
+                if (serverGame == null) { return NotFound(); }
+                serverGame.HealthCheck = DateTime.Now;
+                if (serverGame.MaxPlayers > 1) //Dont save practice games
+                    UpdateDBHealthCheck(gameGuid, serverGame.HealthCheck);
+                var gameTurn = serverGame.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
+                if(gameTurn == null) { return NotFound(); }
+                var startPlayers = gameTurn.Players?.Count();
+                var currentPlayers = 0;
+                Stopwatch timer = new Stopwatch();
+                timer.Start();
+                do
                 {
-                    Stopwatch timer = new Stopwatch();
-                    timer.Start();
-                    do
+                    gameTurn = GetServerMatch(gameGuid).GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
+                    if (gameTurn == null) { return NotFound(); }
+                    currentPlayers = gameTurn.Players?.Count() ?? 0;
+                    if (searchType == (int)SearchType.gameSearch && gameTurn != null && gameTurn.TurnIsOver)
                     {
-                        var gameTurn = GetServerMatch(gameGuid).GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                        if (gameTurn != null && gameTurn.TurnIsOver)
-                        {
-                            return gameTurn;
-                        }
-                        else if (!quickSearch)
-                        {
-                            Thread.Sleep(250);
-                        }
-                    } while (timer.Elapsed.TotalSeconds < 10 && !quickSearch);
-                    timer.Stop();
-                }
-                catch (Exception ex)
-                {
-                    Debug.Print(ex.ToString());
-                    return null;
-                }
-                return null;
+                        return gameTurn;
+                    }
+                    else if (searchType == (int)SearchType.lobbySearch && (startPlayers != currentPlayers || (currentPlayers == serverGame.MaxPlayers)))
+                    {
+                        return gameTurn;
+                    }
+                    else if (searchType != (int)SearchType.quickSearch)
+                    {
+                        Thread.Sleep(250);
+                    }
+                } while (timer.Elapsed.TotalSeconds < 10 && searchType != (int)SearchType.quickSearch);
+                timer.Stop();
+                return gameTurn;
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"{ex}");
             }
         }
 
         [HttpPost]
         [Route("EndTurn")]
-        public bool EndTurn([FromBody] GameTurn currentTurn)
+        public ActionResult<bool> EndTurn([FromBody] GameTurn currentTurn, int clientVersion)
         {
             try
             {
+                var clientVersionText = CheckClientVersion(clientVersion);
+                if (String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                 GameMatch? serverGame = GetServerMatch(currentTurn.GameGuid);
                 GamePlayer? playerTurn = currentTurn.Players?.FirstOrDefault();
-                if (serverGame == null || playerTurn == null)
-                {
-                    return false;
-                }
+                if (serverGame == null || playerTurn == null) { return NotFound(); }
                 GameTurn? gameTurn = serverGame.GameTurns?.FirstOrDefault(x => x.TurnNumber == currentTurn.TurnNumber);
                 if (gameTurn == null)
                 {
@@ -136,20 +149,21 @@ namespace SidusAPI.Controllers
             }
             catch (Exception ex)
             {
-                Debug.Print(ex.ToString());
-                return false;
+                return BadRequest($"{ex}");
             }
             return true;
         }
 
         [HttpGet]
         [Route("FindGames")]
-        public List<GameMatch> FindGames(Guid? playerGuid = null)
+        public ActionResult<List<GameMatch>> FindGames(int clientVersion, Guid? playerGuid = null)
         {
-            using (var context = new ApplicationDbContext())
+            try
             {
-                try
+                using (var context = new ApplicationDbContext())
                 {
+                    var clientVersionText = CheckClientVersion(clientVersion);
+                    if (String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                     var serverGames = context.GameMatches.Include(gm => gm.GameTurns)
                     .ThenInclude(gt => gt.Players).Where(x => !x.IsDeleted && x.GameTurns.Count > 0).ToList(); 
                     var gamesToRemove = serverGames.Where(x => x.GameTurns.FirstOrDefault().Players.Count() < x.MaxPlayers && x.HealthCheck < DateTime.Now.AddHours(-24)).ToList();
@@ -164,51 +178,50 @@ namespace SidusAPI.Controllers
                         serverGames = serverGames.Where(x => !x.IsDeleted && x.GameTurns.FirstOrDefault().Players.Count() < x.MaxPlayers).ToList();
                     return serverGames;
                 }
-                catch (Exception ex)
-                {
-                    Debug.Print(ex.ToString());
-                    return new List<GameMatch>();
-                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"{ex}");
             }
         }
 
         [HttpPost]
         [Route("JoinGame")]
-        public GameMatch? JoinGame(GameMatch ClientGame)
+        public ActionResult<GameMatch?> JoinGame(GameMatch ClientGame, int clientVersion)
         {
             try
             {
+                var clientVersionText = CheckClientVersion(clientVersion);
+                if (String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                 GameMatch? matchToJoin = GetServerMatch(ClientGame.GameGuid);
-                if (matchToJoin != null && matchToJoin.GameTurns?.FirstOrDefault()?.Players != null)
+                if (matchToJoin == null || matchToJoin.GameTurns?.FirstOrDefault()?.Players == null) { return NotFound(); }
+                var currentPlayerCount = matchToJoin.GameTurns.FirstOrDefault().Players.Count();
+                if (currentPlayerCount < matchToJoin.MaxPlayers && ClientGame.GameTurns.FirstOrDefault().Players.Count() > currentPlayerCount)
                 {
-                    var currentPlayerCount = matchToJoin.GameTurns.FirstOrDefault().Players.Count();
-                    if (currentPlayerCount < matchToJoin.MaxPlayers && ClientGame.GameTurns.FirstOrDefault().Players.Count() > currentPlayerCount)
-                    {
-                        var newPlayer = ClientGame.GameTurns.FirstOrDefault().Players.OrderBy(x => x.PlayerColor).Last();
-                        newPlayer.PlayerColor = ClientGame.GameTurns.FirstOrDefault().Players.Count() - 1;
-                        matchToJoin.GameTurns.FirstOrDefault().Players.Add(newPlayer);
-                        UpdateDBAddPlayer(newPlayer);
-                        return matchToJoin;
-                    }
-                    else
-                    {
-                        return matchToJoin;
-                    }
+                    var newPlayer = ClientGame.GameTurns.FirstOrDefault().Players.OrderBy(x => x.PlayerColor).Last();
+                    matchToJoin.GameTurns.FirstOrDefault().Players.Add(newPlayer);
+                    UpdateDBAddPlayer(newPlayer);
+                    return matchToJoin;
+                }
+                else
+                {
+                    return matchToJoin;
                 }
             }
             catch (Exception ex)
             {
-                Debug.Print(ex.ToString());
+                return BadRequest($"{ex}");
             }
-            return null;
         }
 
         [HttpPost]
         [Route("CreateGame")]
-        public GameMatch? CreateGame([FromBody] GameMatch ClientGame)
+        public ActionResult<GameMatch?> CreateGame([FromBody] GameMatch ClientGame, int clientVersion)
         {
             try
             {
+                var clientVersionText = CheckClientVersion(clientVersion);
+                if (String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                 ClientGame.GameGuid = ClientGame.GameGuid;
                 Random rnd = new Random();
                 List<Guid> newModules = new List<Guid>();
@@ -228,17 +241,18 @@ namespace SidusAPI.Controllers
             }
             catch (Exception ex)
             {
-                Debug.Print(ex.ToString());
+                return BadRequest($"{ex}");
             }
-            return null;
         }
 
         [HttpGet]
         [Route("EndGame")]
-        public Guid EndGame(Guid gameGuid, Guid winner)
+        public ActionResult<Guid> EndGame(Guid gameGuid, Guid winner, int clientVersion)
         {
             try
             {
+                var clientVersionText = CheckClientVersion(clientVersion);
+                if (String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                 using (var context = new ApplicationDbContext())
                 {
                     var serverGame = GetServerMatch(gameGuid);
@@ -257,84 +271,36 @@ namespace SidusAPI.Controllers
             }
             catch (Exception ex)
             {
-                Debug.Print(ex.ToString());
+                return BadRequest($"{ex}");
             }
-            return Guid.NewGuid();
         }
 
-        [HttpGet]
-        [Route("HasTakenTurn")]
-        public GameTurn? HasTakenTurn(Guid gameGuid, int turnNumber)
-        {
-            try
-            {
-                var serverGame = GetServerMatch(gameGuid);
-                if (serverGame != null)
-                {
-                    Stopwatch timer = new Stopwatch();
-                    timer.Start();
-                    var gameTurn = serverGame?.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                    var startPlayers = gameTurn?.Players?.Count();
-                    while (timer.Elapsed.TotalSeconds < 10)
-                    {
-                        serverGame.HealthCheck = DateTime.Now;
-                        if (serverGame.MaxPlayers > 1) //Dont save practice games
-                            UpdateDBHealthCheck(gameGuid, serverGame.HealthCheck);
-                        gameTurn = GetServerMatch(gameGuid).GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                        var currentPlayers = gameTurn?.Players?.Count();
-                        if (startPlayers != currentPlayers || (currentPlayers == serverGame.MaxPlayers))
-                        {
-                            return gameTurn;
-                        }
-                        else
-                        {
-                            Thread.Sleep(500);
-                        }
-                    }
-                    timer.Stop();
-                    return gameTurn;
-                }
-                return null;
-            }
-            catch (Exception ex)
-            {
-                Debug.Print(ex.ToString());
-            }
-            return null;
-        }
-        private GameMatch GetServerMatch(Guid gameGuid)
+        private GameMatch? GetServerMatch(Guid gameGuid)
         {
             var game = ServerGames.FirstOrDefault(x => x.GameGuid == gameGuid);
-            try
+            if (game == null)
             {
-                if (game == null)
+                using (var context = new ApplicationDbContext())
                 {
-                    using (var context = new ApplicationDbContext())
+                    game = context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid);
+                    game.GameTurns = context.GameTurns.Where(x => x.GameGuid == gameGuid).OrderBy(x => x.TurnNumber).ToList();
+                    foreach (var gameTurn in game.GameTurns)
                     {
-                        game = context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid);
-                        game.GameTurns = context.GameTurns.Where(x => x.GameGuid == gameGuid).OrderBy(x => x.TurnNumber).ToList();
-                        foreach (var gameTurn in game.GameTurns)
+                        gameTurn.Players = context.GamePlayers.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
+                        gameTurn.AllModules = context.ServerModules.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
+                        gameTurn.AllNodes = context.ServerNodes.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
+                        foreach (var player in gameTurn.Players)
                         {
-                            gameTurn.Players = context.GamePlayers.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
-                            gameTurn.AllModules = context.ServerModules.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
-                            gameTurn.AllNodes = context.ServerNodes.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
-                            foreach (var player in gameTurn.Players)
-                            {
-                                player.Actions = context.ServerActions.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber && x.PlayerGuid == player.PlayerGuid).ToList();
-                                player.Technology = context.ServerTechnologies.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber && x.PlayerGuid == player.PlayerGuid).ToList();
-                                player.Units = context.ServerUnits.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber && x.PlayerGuid == player.PlayerGuid).ToList();
-                            }
-                        }
-                        if (game != null)
-                        {
-                            ServerGames.Add(game);
+                            player.Actions = context.ServerActions.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber && x.PlayerGuid == player.PlayerGuid).ToList();
+                            player.Technology = context.ServerTechnologies.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber && x.PlayerGuid == player.PlayerGuid).ToList();
+                            player.Units = context.ServerUnits.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber && x.PlayerGuid == player.PlayerGuid).ToList();
                         }
                     }
+                    if (game != null)
+                    {
+                        ServerGames.Add(game);
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.Print(ex.ToString());
             }
             return game;
         }
@@ -368,6 +334,14 @@ namespace SidusAPI.Controllers
             if (String.IsNullOrEmpty(csvString))
                 return new List<int>();
             return csvString.Split(",").Select(x => int.Parse(x)).ToList();
+        }
+        private string CheckClientVersion(int clientVersion)
+        {
+            using (var context = new ApplicationDbContext())
+            {
+                var serverVersion = context.Settings.FirstOrDefault().ClientVersion;
+                return serverVersion > clientVersion ? $"New Client version {serverVersion} available. Current Client version {clientVersion}" : "";
+            }
         }
         private async Task UpdateDBHealthCheck(Guid gameGuid, DateTime healthCheck)
         {

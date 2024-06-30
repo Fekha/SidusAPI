@@ -176,4 +176,9 @@ namespace SidusAPI.ServerModels
         public int MidBid { get; set; }
         public int TurnsLeft { get; set; }
     }
+    [Serializable]
+    public class Settings
+    {
+        public int ClientVersion { get; set; }
+    }
 }

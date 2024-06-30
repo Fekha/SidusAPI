@@ -8,6 +8,7 @@ namespace SidusAPI.Data
         public ApplicationDbContext()
         {
         }
+        public DbSet<Settings> Settings { get; set; }
         public DbSet<Account> Accounts { get; set; }
         public DbSet<GameMatch> GameMatches { get; set; }
         public DbSet<GameTurn> GameTurns { get; set; }
@@ -28,6 +29,9 @@ namespace SidusAPI.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Settings>()
+                .HasNoKey();
 
             modelBuilder.Entity<Account>()
                 .HasKey(gt => new { gt.PlayerGuid });
