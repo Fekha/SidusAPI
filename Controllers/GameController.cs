@@ -19,7 +19,7 @@ namespace SidusAPI.Controllers
 
         [HttpGet]
         [Route("GetTurns")]
-        public ActionResult<GameTurn?> GetTurns(Guid gameGuid, int turnNumber, int searchType, int clientVersion)
+        public ActionResult<GameTurn?> GetTurns(Guid gameGuid, int turnNumber, int searchType, int startPlayers, int clientVersion)
         {
             try
             {
@@ -30,21 +30,15 @@ namespace SidusAPI.Controllers
                 serverGame.HealthCheck = DateTime.Now;
                 if (serverGame.MaxPlayers > 1) //Dont save practice games
                     UpdateDBHealthCheck(gameGuid, serverGame.HealthCheck);
-                var gameTurn = serverGame.GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
-                if(searchType == (int)SearchType.quickSearch)
-                {
-                    return gameTurn;
-                }
-                var startPlayers = gameTurn?.Players?.Count() ?? 0;
-                var currentPlayers = 0;
+                GameTurn? gameTurn;
                 Stopwatch timer = new Stopwatch();
                 timer.Start();
-                while (timer.Elapsed.TotalSeconds < 10)
+                do
                 {
                     gameTurn = GetServerMatch(gameGuid).GameTurns?.FirstOrDefault(x => x.TurnNumber == turnNumber);
                     if (gameTurn != null)
                     {
-                        currentPlayers = gameTurn?.Players?.Count() ?? 0;
+                        int currentPlayers = gameTurn?.Players?.Count() ?? 0;
                         if (searchType == (int)SearchType.gameSearch && (startPlayers != currentPlayers || gameTurn.TurnIsOver))
                         {
                             return gameTurn;
@@ -55,7 +49,7 @@ namespace SidusAPI.Controllers
                         }
                     }
                     Thread.Sleep(250);
-                } 
+                } while (timer.Elapsed.TotalSeconds < 10);
                 timer.Stop();
                 return gameTurn;
             }

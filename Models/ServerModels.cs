@@ -69,6 +69,7 @@ namespace SidusAPI.ServerModels
         [Key, Column(Order = 1)]
         public Guid PlayerGuid { get; set; }
         [Key, Column(Order = 2)]
+        public string? PlayerName { get; set; }
         public int TurnNumber { get; set; }
         public int PlayerColor { get; set; }
         public string? ModulesGuids { get; set; }

@@ -83,8 +83,7 @@ namespace SidusAPI.Migrations
                         .HasColumnOrder(0);
 
                     b.Property<int>("TurnNumber")
-                        .HasColumnType("int")
-                        .HasColumnOrder(2);
+                        .HasColumnType("int");
 
                     b.Property<Guid>("PlayerGuid")
                         .HasColumnType("uniqueidentifier")
@@ -119,6 +118,10 @@ namespace SidusAPI.Migrations
 
                     b.Property<int>("PlayerColor")
                         .HasColumnType("int");
+
+                    b.Property<string>("PlayerName")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnOrder(2);
 
                     b.Property<int>("Score")
                         .HasColumnType("int");

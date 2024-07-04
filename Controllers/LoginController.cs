@@ -9,7 +9,7 @@ namespace SidusAPI.Controllers
     {
         [HttpPost]
         [Route("[action]")]
-        public ActionResult<Guid> CreateAccount([FromBody]Account account, int clientVersion)
+        public ActionResult<Account> CreateAccount([FromBody]Account account, int clientVersion)
         {
             try
             {
@@ -24,11 +24,11 @@ namespace SidusAPI.Controllers
                         account.PlayerGuid = Guid.NewGuid();
                         context.Accounts.Add(account);
                         context.SaveChanges();
-                        return account.PlayerGuid;
+                        return account;
                     }
                     else
                     {
-                        return oldAccount.PlayerGuid;
+                        return oldAccount;
                     }
                 }
             }
