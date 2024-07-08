@@ -339,7 +339,13 @@ namespace SidusAPI.Migrations
                     b.Property<string>("AttachedModules")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("DeployRange")
+                        .HasColumnType("int");
+
                     b.Property<int>("ExplosiveDamageModifier")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ExplosiveDeployPower")
                         .HasColumnType("int");
 
                     b.Property<int>("ExplosivePower")
@@ -354,10 +360,10 @@ namespace SidusAPI.Migrations
                     b.Property<int>("HP")
                         .HasColumnType("int");
 
-                    b.Property<bool>("IsStation")
-                        .HasColumnType("bit");
-
                     b.Property<int>("KineticDamageModifier")
+                        .HasColumnType("int");
+
+                    b.Property<int>("KineticDeployPower")
                         .HasColumnType("int");
 
                     b.Property<int>("KineticPower")
@@ -399,11 +405,17 @@ namespace SidusAPI.Migrations
                     b.Property<int>("ThermalDamageModifier")
                         .HasColumnType("int");
 
+                    b.Property<int>("ThermalDeployPower")
+                        .HasColumnType("int");
+
                     b.Property<int>("ThermalPower")
                         .HasColumnType("int");
 
                     b.Property<string>("UnitName")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UnitType")
+                        .HasColumnType("int");
 
                     b.Property<int?>("X")
                         .HasColumnType("int");

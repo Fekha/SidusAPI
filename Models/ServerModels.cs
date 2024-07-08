@@ -129,7 +129,7 @@ namespace SidusAPI.ServerModels
     [Serializable]
     public class ServerUnit
     {
-        public bool IsStation { get; set; }
+        public int UnitType { get; set; }
         [Key, Column(Order = 0)]
         public Guid GameGuid { get; set; }
         [Key, Column(Order = 1)]
@@ -148,12 +148,16 @@ namespace SidusAPI.ServerModels
         public int HP { get; set; }
         public int MaxMovement { get; set; }
         public int MovementLeft { get; set; }
+        public int DeployRange { get; set; }
         public int KineticPower { get; set; }
         public int ThermalPower { get; set; }
         public int ExplosivePower { get; set; }
         public int KineticDamageModifier { get; set; }
         public int ThermalDamageModifier { get; set; }
         public int ExplosiveDamageModifier { get; set; }
+        public int KineticDeployPower { get; set; }
+        public int ThermalDeployPower { get; set; }
+        public int ExplosiveDeployPower { get; set; }
         public int MaxMining { get; set; }
         public int MiningLeft { get; set; }
         public double SupportValue { get; set; }
