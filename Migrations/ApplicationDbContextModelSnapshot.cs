@@ -35,8 +35,14 @@ namespace SidusAPI.Migrations
                     b.Property<string>("Email")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<double?>("Rating")
+                        .HasColumnType("float");
+
                     b.Property<string>("Username")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("Wins")
+                        .HasColumnType("int");
 
                     b.HasKey("PlayerGuid");
 

@@ -17,7 +17,6 @@ namespace SidusAPI.Controllers
                 if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                 using (var context = new ApplicationDbContext())
                 {
-
                     var oldAccount = context.Accounts.FirstOrDefault(a => a.AccountId == account.AccountId);
                     if (oldAccount == null)
                     {

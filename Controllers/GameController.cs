@@ -6,6 +6,7 @@ using SidusAPI.ServerModels;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Numerics;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
@@ -139,6 +140,13 @@ namespace SidusAPI.Controllers
                         gameTurn.AllModules.Add(newModule);
                     }
                     gameTurn.TurnIsOver = true;
+                    foreach (var player in gameTurn.Players)
+                    {
+                        if (player.PlayerGuid != playerTurn.PlayerGuid)
+                        {
+                            NotifyPlayerTurnAsync(player.PlayerGuid);
+                        }
+                    }
                     if (serverGame.MaxPlayers > 1) //Dont save practice games
                         UpdateDBCreateTurn(gameTurn);
                 }
@@ -252,15 +260,15 @@ namespace SidusAPI.Controllers
                 using (var context = new ApplicationDbContext())
                 {
                     var serverGame = GetServerMatch(gameGuid);
-                    if (winner != Guid.Empty)
+                    var game = context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid);
+                    if (game != null && winner != Guid.Empty && serverGame.Winner == Guid.Empty && game.Winner == Guid.Empty)
                     {
                         serverGame.Winner = winner;
-                        var game = context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid);
-                        if (game != null)
-                        {
-                            game.Winner = winner;
-                            context.SaveChanges();
-                        }
+                        game.Winner = winner;
+                        context.Accounts.FirstOrDefault(x => x.PlayerGuid == winner).Wins++;
+                        if (game.MaxPlayers == 2 && game.GameTurns.Count > 5)
+                            UpdateRatings(winner, game.GameTurns[0].Players.FirstOrDefault(x => x.PlayerGuid != winner).PlayerGuid);
+                        context.SaveChanges();
                     }
                     return serverGame.Winner;
                 }
@@ -423,6 +431,53 @@ namespace SidusAPI.Controllers
                         context.ServerActions.AddRange(newPlayer.Actions);
                     }
                     await context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print(ex.ToString());
+                }
+            }
+        }
+
+        public async Task NotifyPlayerTurnAsync(Guid playerGuid)
+        {
+            using (var context = new ApplicationDbContext())
+            {
+                try
+                {
+                    var player = context.Accounts.FirstOrDefault(x => x.PlayerGuid == playerGuid);
+                    if (player != null && !String.IsNullOrEmpty(player.Email))
+                    {
+                        var subject = "Your Turn in Sydus!";
+                        var body = "It's your turn to make a move. Log in to the game and take your turn.";
+                        await EmailService.SendEmailAsync(player.Email, subject, body);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print(ex.ToString());
+                }
+            }
+        }
+
+        public double CalculateExpectedScore(double playerRating, double opponentRating)
+        {
+            return 1.0 / (1.0 + Math.Pow(10, (opponentRating - playerRating) / 400));
+        }
+
+        public void UpdateRatings(Guid winnerGuid, Guid loserGuid, int k = 32)
+        {
+            using (var context = new ApplicationDbContext())
+            {
+                try
+                {
+                    var winner = context.Accounts.FirstOrDefault(x => x.PlayerGuid == winnerGuid);
+                    var loser = context.Accounts.FirstOrDefault(x => x.PlayerGuid == loserGuid);
+                    double expectedWinner = CalculateExpectedScore((double)winner.Rating, (double)loser.Rating);
+                    double expectedLoser = CalculateExpectedScore((double)loser.Rating, (double)winner.Rating);
+                    winner.Rating = winner.Rating + k * (1 - expectedWinner);
+                    loser.Rating = loser.Rating + k * (0 - expectedLoser);
+                    context.SaveChangesAsync();
                 }
                 catch (Exception ex)
                 {

@@ -11,7 +11,8 @@ namespace SidusAPI.ServerModels
         public string AccountId { get; set; }
         public string? Username { get; set; }
         public string? Email { get; set; }
-        
+        public double? Rating { get; set; }
+        public int? Wins { get; set; }
     }
 
     [Serializable]
