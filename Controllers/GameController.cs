@@ -257,21 +257,13 @@ namespace SidusAPI.Controllers
             {
                 var clientVersionText = CheckClientVersion(clientVersion);
                 if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
-                using (var context = new ApplicationDbContext())
+                var serverGame = GetServerMatch(gameGuid);
+                if (serverGame.Winner == Guid.Empty && winner != Guid.Empty)
                 {
-                    var serverGame = GetServerMatch(gameGuid);
-                    var game = context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid);
-                    if (game != null && winner != Guid.Empty && serverGame.Winner == Guid.Empty && game.Winner == Guid.Empty)
-                    {
-                        serverGame.Winner = winner;
-                        game.Winner = winner;
-                        context.Accounts.FirstOrDefault(x => x.PlayerGuid == winner).Wins++;
-                        if (serverGame.MaxPlayers == 2 && serverGame.GameTurns.Count > 5)
-                            UpdateRatings(winner, serverGame.GameTurns[0].Players.FirstOrDefault(x => x.PlayerGuid != winner).PlayerGuid);
-                        context.SaveChanges();
-                    }
-                    return serverGame.Winner;
+                    serverGame.Winner = winner;
+                    UpdateRatings(winner, serverGame);
                 }
+                return serverGame.Winner;
             }
             catch (Exception ex)
             {
@@ -465,19 +457,30 @@ namespace SidusAPI.Controllers
             return 1.0 / (1.0 + Math.Pow(10, (opponentRating - playerRating) / 400));
         }
 
-        public void UpdateRatings(Guid winnerGuid, Guid loserGuid, int k = 32)
+        public async Task UpdateRatings(Guid winnerGuid, GameMatch serverGame, int k = 32)
         {
             using (var context = new ApplicationDbContext())
             {
                 try
                 {
-                    var winner = context.Accounts.FirstOrDefault(x => x.PlayerGuid == winnerGuid);
-                    var loser = context.Accounts.FirstOrDefault(x => x.PlayerGuid == loserGuid);
-                    double expectedWinner = CalculateExpectedScore((double)winner.Rating, (double)loser.Rating);
-                    double expectedLoser = CalculateExpectedScore((double)loser.Rating, (double)winner.Rating);
-                    winner.Rating = winner.Rating + k * (1 - expectedWinner);
-                    loser.Rating = loser.Rating + k * (0 - expectedLoser);
-                    context.SaveChangesAsync();
+                    var loserGuid = serverGame.GameTurns[0].Players.FirstOrDefault(x => x.PlayerGuid != winnerGuid).PlayerGuid;
+                    var game = context.GameMatches.FirstOrDefault(x => x.GameGuid == serverGame.GameGuid);
+                    if (game != null && game.Winner == Guid.Empty)
+                    {
+                        game.Winner = winnerGuid;
+                        var winner = context.Accounts.FirstOrDefault(x => x.PlayerGuid == winnerGuid);
+                        winner.Wins++;
+                        //Only rating 2 player games that have lasted for at least 5 turns
+                        if (serverGame.MaxPlayers == 2 && serverGame.GameTurns.Count > 5)
+                        {
+                            var loser = context.Accounts.FirstOrDefault(x => x.PlayerGuid == loserGuid);
+                            double expectedWinner = CalculateExpectedScore((double)winner.Rating, (double)loser.Rating);
+                            double expectedLoser = CalculateExpectedScore((double)loser.Rating, (double)winner.Rating);
+                            winner.Rating = winner.Rating + k * (1 - expectedWinner);
+                            loser.Rating = loser.Rating + k * (0 - expectedLoser);
+                        }
+                        await context.SaveChangesAsync();
+                    }
                 }
                 catch (Exception ex)
                 {
