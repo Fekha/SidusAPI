@@ -266,8 +266,8 @@ namespace SidusAPI.Controllers
                         serverGame.Winner = winner;
                         game.Winner = winner;
                         context.Accounts.FirstOrDefault(x => x.PlayerGuid == winner).Wins++;
-                        if (game.MaxPlayers == 2 && game.GameTurns.Count > 5)
-                            UpdateRatings(winner, game.GameTurns[0].Players.FirstOrDefault(x => x.PlayerGuid != winner).PlayerGuid);
+                        if (serverGame.MaxPlayers == 2 && serverGame.GameTurns.Count > 5)
+                            UpdateRatings(winner, serverGame.GameTurns[0].Players.FirstOrDefault(x => x.PlayerGuid != winner).PlayerGuid);
                         context.SaveChanges();
                     }
                     return serverGame.Winner;
