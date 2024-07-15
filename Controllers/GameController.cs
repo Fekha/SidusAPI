@@ -144,7 +144,7 @@ namespace SidusAPI.Controllers
                     {
                         if (player.PlayerGuid != playerTurn.PlayerGuid)
                         {
-                            NotifyPlayerTurnAsync(player.PlayerGuid);
+                            NotifyPlayerTurnAsync(player.PlayerGuid, gameTurn.GameGuid);
                         }
                     }
                     if (serverGame.MaxPlayers > 1) //Dont save practice games
@@ -439,17 +439,17 @@ namespace SidusAPI.Controllers
             }
         }
 
-        public async Task NotifyPlayerTurnAsync(Guid playerGuid)
+        public async Task NotifyPlayerTurnAsync(Guid playerGuid, Guid gameGuid)
         {
             using (var context = new ApplicationDbContext())
             {
                 try
                 {
                     var player = context.Accounts.FirstOrDefault(x => x.PlayerGuid == playerGuid);
-                    if (player != null && !String.IsNullOrEmpty(player.Email))
+                    if (player != null && player.NotifiyByEmail == true && !String.IsNullOrEmpty(player.Email))
                     {
                         var subject = "Your Turn in Sydus!";
-                        var body = "It's your turn to make a move. Log in to the game and take your turn.";
+                        var body = $"Log in to make a move in your game {gameGuid}.";
                         await EmailService.SendEmailAsync(player.Email, subject, body);
                     }
                 }

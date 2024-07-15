@@ -6,15 +6,14 @@ public static class EmailService
     public static async Task SendEmailAsync(string toEmail, string subject, string body)
     {
         var smtpHost = "smtp.gmail.com";
-        var smtpPort = 465;
-        var smtpUser = "notifications@gravitasgames.com";
-        var smtpPass = "Version101";
-        var enableSsl = true;
+        var smtpPort = 587;
+        var smtpUser = "sydus.notifications@gmail.com";
+        var smtpPass = "fxqxkdlbxxvunkim";
 
         using var client = new SmtpClient(smtpHost, smtpPort)
         {
             Credentials = new NetworkCredential(smtpUser, smtpPass),
-            EnableSsl = enableSsl
+            EnableSsl = true
         };
 
         var mailMessage = new MailMessage

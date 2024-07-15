@@ -35,6 +35,9 @@ namespace SidusAPI.Migrations
                     b.Property<string>("Email")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool?>("NotifiyByEmail")
+                        .HasColumnType("bit");
+
                     b.Property<double?>("Rating")
                         .HasColumnType("float");
 
