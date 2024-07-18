@@ -2,13 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SidusAPI.Data;
 using SidusAPI.Enums;
+using SidusAPI.Migrations;
 using SidusAPI.ServerModels;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Numerics;
-using System.Reflection;
-using System.Text.RegularExpressions;
 
 namespace SidusAPI.Controllers
 {
@@ -111,7 +107,7 @@ namespace SidusAPI.Controllers
                             }
                             else
                             {
-                                var newModule = GetNewServerModule(gameTurn, serverGame.NumberOfModules, 3, gameTurn.GameGuid, gameTurn.TurnNumber);
+                                var newModule = GetNewServerModule(gameTurn, serverGame, 3, gameTurn.TurnNumber);
                                 gameTurn.MarketModuleGuids = gameTurn.MarketModuleGuids.Replace(moduleGuid.ToString(), newModule.ModuleGuid.ToString());
                                 gameTurn.AllModules.Add(newModule);
                                 gameTurn.AllModules.Remove(module);
@@ -135,7 +131,7 @@ namespace SidusAPI.Controllers
                         {
                             bid.FirstOrDefault().PlayerBid = module.MidBid;
                         }
-                        var newModule = GetNewServerModule(gameTurn, serverGame.NumberOfModules, 3, gameTurn.GameGuid, gameTurn.TurnNumber);
+                        var newModule = GetNewServerModule(gameTurn, serverGame, 3, gameTurn.TurnNumber);
                         gameTurn.MarketModuleGuids = gameTurn.MarketModuleGuids.Replace(module.ModuleGuid.ToString(), newModule.ModuleGuid.ToString());
                         gameTurn.AllModules.Add(newModule);
                     }
@@ -174,6 +170,7 @@ namespace SidusAPI.Controllers
                     foreach (var game in gamesToRemove)
                     {
                         game.IsDeleted = true;
+                        serverGames.FirstOrDefault(x => x.GameGuid == game.GameGuid).IsDeleted = true;
                     }
                     UpdateDBSave(context);
                     if (playerGuid != null)
@@ -227,19 +224,22 @@ namespace SidusAPI.Controllers
                 var clientVersionText = CheckClientVersion(clientVersion);
                 if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
                 ClientGame.GameGuid = ClientGame.GameGuid;
-                Random rnd = new Random();
+                ClientGame.Winner = Guid.Empty;
+                ClientGame.HealthCheck = DateTime.Now;
+                using (var context = new ApplicationDbContext())
+                {
+                    ClientGame.ModuleJson = context.Settings.FirstOrDefault().ModuleJson;
+                }
                 List<Guid> newModules = new List<Guid>();
                 for (int i = 0; i < 3; i++)
                 {
-                    var newModule = GetNewServerModule(ClientGame.GameTurns.FirstOrDefault(), ClientGame.NumberOfModules, i + 1, ClientGame.GameGuid, 0);
+                    var newModule = GetNewServerModule(ClientGame.GameTurns.FirstOrDefault(), ClientGame, i + 1, 0);
                     ClientGame.GameTurns.FirstOrDefault().AllModules.Add(newModule);
                     newModules.Add(newModule.ModuleGuid);
                 }
                 ClientGame.GameTurns.FirstOrDefault().MarketModuleGuids = String.Join(",", newModules);
-                ClientGame.Winner = Guid.Empty;
-                ClientGame.HealthCheck = DateTime.Now;
                 if (ClientGame.MaxPlayers > 1) //Dont save practice games
-                    UpdateDBCreateGame(ClientGame);
+                UpdateDBCreateGame(ClientGame);
                 ServerGames.Add(ClientGame);
                 return ClientGame;
             }
@@ -279,8 +279,8 @@ namespace SidusAPI.Controllers
                 using (var context = new ApplicationDbContext())
                 {
                     game = context.GameMatches.FirstOrDefault(x => x.GameGuid == gameGuid);
-                    game.GameTurns = context.GameTurns.Where(x => x.GameGuid == gameGuid).OrderBy(x => x.TurnNumber).ToList();
-                    foreach (var gameTurn in game.GameTurns)
+                    game.GameTurns = context.GameTurns.Where(x => x.GameGuid == gameGuid).ToList();
+                    foreach (var gameTurn in game.GameTurns?.OrderBy(x => x.TurnNumber))
                     {
                         gameTurn.Players = context.GamePlayers.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
                         gameTurn.AllModules = context.ServerModules.Where(x => x.GameGuid == gameGuid && x.TurnNumber == gameTurn.TurnNumber).ToList();
@@ -300,8 +300,10 @@ namespace SidusAPI.Controllers
             }
             return game;
         }
-        private ServerModule GetNewServerModule(GameTurn GameTurn, int maxNum, int maxTurns, Guid gameGuid, int turnNumber)
+        private ServerModule GetNewServerModule(GameTurn GameTurn, GameMatch GameMatch, int maxTurns, int turnNumber)
         {
+            int maxNum = GameMatch.ModuleJson.Split("{").Count();
+            Guid gameGuid = GameMatch.GameGuid;
             List<int> numMods = GetIntListFromString(GameTurn.ModulesForMarket);
             if (numMods.Count <= 0)
             {

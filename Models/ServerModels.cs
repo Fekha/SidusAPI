@@ -22,12 +22,12 @@ namespace SidusAPI.ServerModels
         [Key]
         public Guid GameGuid { get; set; }
         public int MaxPlayers { get; set; }
-        public int NumberOfModules { get; set; }
         public string? GameSettings { get; set; }
         public Guid Winner { get; set; }
         public bool IsDeleted { get; set; }
         public DateTime HealthCheck { get; set; }
         public List<GameTurn>? GameTurns { get; set; }
+        public string? ModuleJson { get; set; }
     }
 
     [Serializable]
@@ -187,5 +187,6 @@ namespace SidusAPI.ServerModels
     public class Settings
     {
         public int ClientVersion { get; set; }
+        public string? ModuleJson { get; set; }
     }
 }

@@ -72,8 +72,8 @@ namespace SidusAPI.Migrations
                     b.Property<int>("MaxPlayers")
                         .HasColumnType("int");
 
-                    b.Property<int>("NumberOfModules")
-                        .HasColumnType("int");
+                    b.Property<string>("ModuleJson")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("Winner")
                         .HasColumnType("uniqueidentifier");
@@ -443,6 +443,9 @@ namespace SidusAPI.Migrations
                 {
                     b.Property<int>("ClientVersion")
                         .HasColumnType("int");
+
+                    b.Property<string>("ModuleJson")
+                        .HasColumnType("nvarchar(max)");
 
                     b.ToTable("Settings");
                 });
