@@ -22,7 +22,7 @@ namespace SidusAPI.Data
         {
             if (!optionsBuilder.IsConfigured)
             {
-                optionsBuilder.UseSqlServer("Server=data.gravitas-games.com, 1433;Database=SydusDB;User Id=SA;Password=Veersion101#;")
+                optionsBuilder.UseSqlServer("Server=tcp:sydus.database.windows.net,1433;Initial Catalog=Sydus;Persist Security Info=False;User ID=sql_james;Password=Version101#;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;")
                    .EnableSensitiveDataLogging(true);
             }
         }

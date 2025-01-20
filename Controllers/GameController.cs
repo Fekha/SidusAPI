@@ -239,7 +239,7 @@ namespace SidusAPI.Controllers
                 }
                 ClientGame.GameTurns.FirstOrDefault().MarketModuleGuids = String.Join(",", newModules);
                 if (ClientGame.MaxPlayers > 1) //Dont save practice games
-                UpdateDBCreateGame(ClientGame);
+                    UpdateDBCreateGame(ClientGame);
                 ServerGames.Add(ClientGame);
                 return ClientGame;
             }
@@ -307,7 +307,7 @@ namespace SidusAPI.Controllers
             List<int> numMods = GetIntListFromString(GameTurn.ModulesForMarket);
             if (numMods.Count <= 0)
             {
-                for (int i = 0; i <= maxNum; i++)
+                for (int i = 1; i < maxNum; i++)
                 {
                     numMods.Add(i);
                 }
@@ -327,7 +327,7 @@ namespace SidusAPI.Controllers
                 MidBid = (2 * maxTurns) + 4,
             };
         }
-        public List<int> GetIntListFromString(string? csvString)
+        private List<int> GetIntListFromString(string? csvString)
         {
             if (String.IsNullOrEmpty(csvString))
                 return new List<int>();
@@ -433,7 +433,7 @@ namespace SidusAPI.Controllers
             }
         }
 
-        public async Task NotifyPlayerTurnAsync(Guid playerGuid, Guid gameGuid)
+        private async Task NotifyPlayerTurnAsync(Guid playerGuid, Guid gameGuid)
         {
             using (var context = new ApplicationDbContext())
             {
@@ -454,12 +454,12 @@ namespace SidusAPI.Controllers
             }
         }
 
-        public double CalculateExpectedScore(double playerRating, double opponentRating)
+        private double CalculateExpectedScore(double playerRating, double opponentRating)
         {
             return 1.0 / (1.0 + Math.Pow(10, (opponentRating - playerRating) / 400));
         }
 
-        public async Task UpdateRatings(Guid winnerGuid, GameMatch serverGame, int k = 32)
+        private async Task UpdateRatings(Guid winnerGuid, GameMatch serverGame, int k = 32)
         {
             using (var context = new ApplicationDbContext())
             {

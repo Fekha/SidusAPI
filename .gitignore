@@ -134,3 +134,7 @@ $RECYCLE.BIN/
 
 _NCrunch*
 star_image.tar
+Properties/serviceDependencies.json
+Properties/serviceDependencies.Sydus2 - Web Deploy.json
+Properties/ServiceDependencies/Sydus2 - Web Deploy/apis1.arm.json
+Properties/ServiceDependencies/Sydus2 - Web Deploy/profile.arm.json

@@ -36,7 +36,31 @@ namespace SidusAPI.Controllers
                 return BadRequest($"{ex}");
             }
         }
-        
+        [HttpPost]
+        [Route("[action]")]
+        public ActionResult<string> UpdateAccount([FromBody] Account account, int clientVersion)
+        {
+            try
+            {
+                var clientVersionText = CheckClientVersion(clientVersion);
+                if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
+                using (var context = new ApplicationDbContext())
+                {
+                    var oldAccount = context.Accounts.FirstOrDefault(a => a.AccountId == account.AccountId);
+                    if (oldAccount != null)
+                    {
+                        oldAccount.NotifiyByEmail = account.NotifiyByEmail;
+                        context.SaveChanges();
+                    }
+                    return Ok();
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"{ex}");
+            }
+        }
+
         [HttpGet]
         [Route("[action]")]
         public ActionResult<Account> GetAccount(string accountId, int clientVersion)
