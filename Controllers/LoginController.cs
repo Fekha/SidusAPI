@@ -80,6 +80,25 @@ namespace SidusAPI.Controllers
             }
         }
 
+        [HttpGet]
+        [Route("[action]")]
+        public ActionResult<Account?> CheckAccountExists(string username, int clientVersion)
+        {
+            try
+            {
+                var clientVersionText = CheckClientVersion(clientVersion);
+                if (!String.IsNullOrEmpty(clientVersionText)) { return BadRequest(clientVersionText); }
+                using (var context = new ApplicationDbContext())
+                {
+                    return context.Accounts.FirstOrDefault(a => a.Username == username);
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"{ex}");
+            }
+        }
+
         private string CheckClientVersion(int clientVersion)
         {
             using (var context = new ApplicationDbContext())
