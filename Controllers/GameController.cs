@@ -25,7 +25,7 @@ namespace SidusAPI.Controllers
                 var serverGame = GetServerMatch(gameGuid);
                 if (serverGame == null) { return NotFound(); }
                 serverGame.HealthCheck = DateTime.Now;
-                if (serverGame.MaxPlayers > 1) //Dont save practice games
+                if (!serverGame.GameSettings.Contains("PracticeGame")) //Dont save practice games
                     UpdateDBHealthCheck(gameGuid, serverGame.HealthCheck);
                 GameTurn? gameTurn;
                 Stopwatch timer = new Stopwatch();
@@ -73,7 +73,7 @@ namespace SidusAPI.Controllers
                     currentTurn.TurnIsOver = false;
                     serverGame.GameTurns.Add(currentTurn);
                     gameTurn = currentTurn;
-                    if (serverGame.MaxPlayers > 1) //Dont save practice games
+                    if (!serverGame.GameSettings.Contains("PracticeGame")) //Dont save practice games
                         UpdateDBCreateTurn(gameTurn);
                 }
                 else if (!gameTurn.TurnIsOver)
@@ -87,7 +87,7 @@ namespace SidusAPI.Controllers
                     {
                         gameTurn.Players[turnIndex] = playerTurn;
                     }
-                    if (serverGame.MaxPlayers > 1) //Dont save practice games
+                    if (!serverGame.GameSettings.Contains("PracticeGame")) //Dont save practice games
                         UpdateDBAddPlayer(playerTurn);
                 }
                 //Do market stuff if everyone is done with their turns
@@ -143,7 +143,7 @@ namespace SidusAPI.Controllers
                             NotifyPlayerTurnAsync(player.PlayerGuid, gameTurn.GameGuid);
                         }
                     }
-                    if (serverGame.MaxPlayers > 1) //Dont save practice games
+                    if (!serverGame.GameSettings.Contains("PracticeGame")) //Dont save practice games
                         UpdateDBCreateTurn(gameTurn);
                 }
             }
@@ -174,7 +174,7 @@ namespace SidusAPI.Controllers
                     }
                     UpdateDBSave(context);
                     if (playerGuid != null)
-                        serverGames = serverGames.Where(x => !x.IsDeleted && x.MaxPlayers>1 && x.Winner == Guid.Empty && x.GameTurns.FirstOrDefault().Players.Any(x => x.PlayerGuid == playerGuid)).ToList();
+                        serverGames = serverGames.Where(x => !x.IsDeleted && !x.GameSettings.Contains("PracticeGame") && x.Winner == Guid.Empty && x.GameTurns.FirstOrDefault().Players.Any(x => x.PlayerGuid == playerGuid)).ToList();
                     else
                         serverGames = serverGames.Where(x => !x.IsDeleted && x.GameTurns.FirstOrDefault().Players.Count() < x.MaxPlayers).ToList();
                     return serverGames;
@@ -238,7 +238,7 @@ namespace SidusAPI.Controllers
                     newModules.Add(newModule.ModuleGuid);
                 }
                 ClientGame.GameTurns.FirstOrDefault().MarketModuleGuids = String.Join(",", newModules);
-                if (ClientGame.MaxPlayers > 1) //Dont save practice games
+                if (!ClientGame.GameSettings.Contains("PracticeGame")) //Dont save practice games
                     UpdateDBCreateGame(ClientGame);
                 ServerGames.Add(ClientGame);
                 return ClientGame;
