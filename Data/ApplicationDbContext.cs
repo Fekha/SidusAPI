@@ -22,10 +22,10 @@ namespace SidusAPI.Data
         {
             if (!optionsBuilder.IsConfigured)
             {
-                optionsBuilder.UseSqlServer("Server=(LocalDb)\\MSSQLLocalDB;Initial Catalog=Sydus;Integrated Security=SSPI;")
-                   .EnableSensitiveDataLogging(true);
-                //optionsBuilder.UseSqlServer("Server=tcp:sydus.database.windows.net,1433;Initial Catalog=Sydus;Persist Security Info=False;User ID=sql_james;Password=Version101#;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;")
+                //optionsBuilder.UseSqlServer("Server=(LocalDb)\\MSSQLLocalDB;Initial Catalog=Sydus;Integrated Security=SSPI;")
                 //   .EnableSensitiveDataLogging(true);
+                optionsBuilder.UseSqlServer("Server=tcp:sydus.database.windows.net,1433;Initial Catalog=Sydus;Persist Security Info=False;User ID=sql_james;Password=Version101#;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;")
+                   .EnableSensitiveDataLogging(true);
                 //run the command 'update-database' if rebuilding new server
             }
         }
